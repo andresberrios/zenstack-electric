@@ -40,6 +40,19 @@ const OP_MAP: Record<string, string> = {
   '>=': '>=',
 }
 
+function ruleMatchesOperation(
+  rule: { args?: readonly { name?: string, value: Expression }[] },
+  targetOp: string,
+): boolean {
+  const opArg = rule.args?.find(a => a.name === 'operation')
+  if (!opArg)
+    return true
+  const opValue = opArg.value.value as string
+  if (opValue === 'all')
+    return true
+  return opValue.split(',').map(s => s.trim()).includes(targetOp)
+}
+
 /**
  * Compile ZenStack @@allow and @@deny policies for a model into an
  * Electric-compatible ShapeFilterDef with parameterized auth paths.
@@ -51,16 +64,17 @@ const OP_MAP: Record<string, string> = {
 export function compileModelFilter(
   modelName: string,
   schema: SchemaDef,
+  operation: string = 'read',
 ): ShapeFilterDef | null {
   const model = schema.models[modelName] as ModelDef | undefined
   if (!model)
     throw new Error(`Unknown model: ${modelName}`)
 
   const allowRules = (model.attributes ?? []).filter(
-    a => a.name === '@@allow',
+    a => a.name === '@@allow' && ruleMatchesOperation(a, operation),
   )
   const denyRules = (model.attributes ?? []).filter(
-    a => a.name === '@@deny',
+    a => a.name === '@@deny' && ruleMatchesOperation(a, operation),
   )
 
   if (allowRules.length === 0) {
@@ -135,7 +149,7 @@ export function compileAllFilters(
 ): Record<string, ShapeFilterDef | null> {
   const result: Record<string, ShapeFilterDef | null> = {}
   for (const modelName of Object.keys(schema.models)) {
-    result[modelName] = compileModelFilter(modelName, schema)
+    result[modelName] = compileModelFilter(modelName, schema, 'read')
   }
   return result
 }

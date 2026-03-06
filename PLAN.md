@@ -157,16 +157,16 @@ whose operation arg is `'all'` or contains `'read'` (split on comma, trim).
 `operation: 'all'`. Create an `allowOp(operation, condition)` variant, or update `allow()`
 to accept an operation parameter.
 
-- [ ] In `compile.ts`, add an `operation` parameter to `compileModelFilter` (default: `'read'`)
-- [ ] Filter rules: only process those whose operation arg is `'all'` or includes the target operation
-- [ ] `compileAllFilters` passes `'read'` since Electric shapes are read-only
-- [ ] Update or extend the `allow()` test helper to accept a custom operation string
-- [ ] Add unit test: `@@allow('create', condition)` is ignored → deny-all for read
-- [ ] Add unit test: `@@allow('read', condition)` is respected
-- [ ] Add unit test: `@@allow('all', condition)` is respected
-- [ ] Add unit test: `@@allow('create,read', condition)` is respected
-- [ ] Add unit test: `@@deny('update', condition)` is ignored for read
-- [ ] Add unit test: mixed — `@@allow('create', cond1) + @@allow('read', cond2)` → only cond2
+- [x] In `compile.ts`, add an `operation` parameter to `compileModelFilter` (default: `'read'`)
+- [x] Filter rules: only process those whose operation arg is `'all'` or includes the target operation
+- [x] `compileAllFilters` passes `'read'` since Electric shapes are read-only
+- [x] Update or extend the `allow()` test helper to accept a custom operation string
+- [x] Add unit test: `@@allow('create', condition)` is ignored → deny-all for read
+- [x] Add unit test: `@@allow('read', condition)` is respected
+- [x] Add unit test: `@@allow('all', condition)` is respected
+- [x] Add unit test: `@@allow('create,read', condition)` is respected
+- [x] Add unit test: `@@deny('update', condition)` is ignored for read
+- [x] Add unit test: mixed — `@@allow('create', cond1) + @@allow('read', cond2)` → only cond2
 
 **Files:** `src/compile.ts`, `test/index.test.ts`
 

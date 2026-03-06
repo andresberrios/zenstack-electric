@@ -54,6 +54,26 @@ function deny(condition: unknown) {
   }
 }
 
+function allowOp(operation: string, condition: unknown) {
+  return {
+    name: '@@allow',
+    args: [
+      { name: 'operation', value: { kind: 'literal', value: operation } },
+      { name: 'condition', value: condition },
+    ],
+  }
+}
+
+function denyOp(operation: string, condition: unknown) {
+  return {
+    name: '@@deny',
+    args: [
+      { name: 'operation', value: { kind: 'literal', value: operation } },
+      { name: 'condition', value: condition },
+    ],
+  }
+}
+
 // Expression builders (mirror ZenStack's ExpressionUtils)
 const E = {
   literal: (value: string | number | boolean) => ({ kind: 'literal', value }),
@@ -486,6 +506,80 @@ describe('compileModelFilter', () => {
           { kind: 'static', value: 'PUBLIC' },
           { kind: 'auth', path: ['id'] },
         ],
+      })
+    })
+  })
+
+  describe('operation filtering', () => {
+    it('ignores @@allow("create", condition) for read operation', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allowOp('create', E.binary(E.field('status'), '==', E.literal('ACTIVE'))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: 'false',
+        params: [],
+      })
+    })
+
+    it('respects @@allow("read", condition)', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allowOp('read', E.binary(E.field('status'), '==', E.literal('ACTIVE'))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"status" = $1',
+        params: [{ kind: 'static', value: 'ACTIVE' }],
+      })
+    })
+
+    it('respects @@allow("all", condition)', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allowOp('all', E.binary(E.field('status'), '==', E.literal('ACTIVE'))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"status" = $1',
+        params: [{ kind: 'static', value: 'ACTIVE' }],
+      })
+    })
+
+    it('respects @@allow("create,read", condition)', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allowOp('create,read', E.binary(E.field('status'), '==', E.literal('ACTIVE'))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"status" = $1',
+        params: [{ kind: 'static', value: 'ACTIVE' }],
+      })
+    })
+
+    it('ignores @@deny("update", condition) for read operation', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          denyOp('update', E.binary(E.field('status'), '==', E.literal('LOCKED'))),
+          allow(E.literal(true)),
+        ]),
+      )
+      // deny is ignored, allow(true) → null (no restriction)
+      expect(compileModelFilter('User', schema)).toBeNull()
+    })
+
+    it('only applies matching rules: @@allow("create", cond1) + @@allow("read", cond2) → only cond2', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status'), field('role')], [
+          allowOp('create', E.binary(E.field('role'), '==', E.literal('ADMIN'))),
+          allowOp('read', E.binary(E.field('status'), '==', E.literal('ACTIVE'))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"status" = $1',
+        params: [{ kind: 'static', value: 'ACTIVE' }],
       })
     })
   })
