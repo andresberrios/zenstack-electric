@@ -844,6 +844,125 @@ describe('compileModelFilter', () => {
         params: [],
       })
     })
+
+    it('compiles some (?) with auth-dependent inner condition', () => {
+      const schema = authorPostSchema('?', E.binary(E.field('authorId'), '==', E.member(E.call('auth'), ['id'])))
+      const result = compileModelFilter('Author', schema)
+      expect(result).toEqual({
+        where: '"id" IN (SELECT "authorId" FROM "Post" WHERE "authorId" = $1)',
+        params: [{ kind: 'auth', path: ['id'] }],
+      })
+    })
+
+    it('compiles some (?) with compound inner condition', () => {
+      const schema = makeSchema(
+        model('Post', [
+          field('id'),
+          field('published', { type: 'Boolean' }),
+          field('status'),
+          field('authorId'),
+          field('author', { type: 'Author', relation: { fields: ['authorId'], references: ['id'], opposite: 'posts' } }),
+        ]),
+        model('Author', [
+          field('id'),
+          field('posts', { type: 'Post', array: true, relation: { opposite: 'author' } }),
+        ], [
+          allow(E.binary(E.field('posts'), '?', E.binary(
+            E.binary(E.field('published'), '==', E.literal(true)),
+            '&&',
+            E.binary(E.field('status'), '==', E.literal('LIVE')),
+          ))),
+        ]),
+      )
+      const result = compileModelFilter('Author', schema)
+      expect(result).toEqual({
+        where: '"id" IN (SELECT "authorId" FROM "Post" WHERE ("published" = true) AND ("status" = $1))',
+        params: [{ kind: 'static', value: 'LIVE' }],
+      })
+    })
+
+    it('compiles collection predicate with true inner condition (no WHERE)', () => {
+      const schema = authorPostSchema('?', E.literal(true))
+      const result = compileModelFilter('Author', schema)
+      expect(result).toEqual({
+        where: '"id" IN (SELECT "authorId" FROM "Post")',
+        params: [],
+      })
+    })
+
+    it('throws for collection predicate on non-relation field', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('name')], [
+          allow(E.binary(E.field('name'), '?', E.binary(E.field('id'), '==', E.literal('x')))),
+        ]),
+      )
+      expect(() => compileModelFilter('User', schema)).toThrow('is not a relation')
+    })
+
+    it('compiles two separate relation traversals ANDed', () => {
+      const schema = makeSchema(
+        model('A', [field('id'), field('x')]),
+        model('B', [field('id'), field('y')]),
+        model('C', [
+          field('id'),
+          field('aId'),
+          field('bId'),
+          field('a', { type: 'A', relation: { fields: ['aId'], references: ['id'] } }),
+          field('b', { type: 'B', relation: { fields: ['bId'], references: ['id'] } }),
+        ], [
+          allow(E.binary(
+            E.binary(E.member(E.field('a'), ['x']), '==', E.literal('foo')),
+            '&&',
+            E.binary(E.member(E.field('b'), ['y']), '==', E.literal('bar')),
+          )),
+        ]),
+      )
+      expect(compileModelFilter('C', schema)).toEqual({
+        where: '("aId" IN (SELECT "id" FROM "A" WHERE "x" = $1)) AND ("bId" IN (SELECT "id" FROM "B" WHERE "y" = $2))',
+        params: [
+          { kind: 'static', value: 'foo' },
+          { kind: 'static', value: 'bar' },
+        ],
+      })
+    })
+
+    it('compiles self-referential relation', () => {
+      const schema = makeSchema(
+        model('User', [
+          field('id'),
+          field('name'),
+          field('managerId'),
+          field('manager', { type: 'User', relation: { fields: ['managerId'], references: ['id'] } }),
+        ], [
+          allow(E.binary(
+            E.member(E.field('manager'), ['name']),
+            '==',
+            E.member(E.call('auth'), ['name']),
+          )),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"managerId" IN (SELECT "id" FROM "User" WHERE "name" = $1)',
+        params: [{ kind: 'auth', path: ['name'] }],
+      })
+    })
+
+    it('throws for collection predicate on relation without opposite', () => {
+      const schema = makeSchema(
+        model('Post', [
+          field('id'),
+          field('authorId'),
+          field('author', { type: 'Author', relation: { fields: ['authorId'], references: ['id'] } }),
+        ]),
+        model('Author', [
+          field('id'),
+          field('posts', { type: 'Post', array: true, relation: {} }),
+        ], [
+          allow(E.binary(E.field('posts'), '?', E.binary(E.field('id'), '==', E.literal('x')))),
+        ]),
+      )
+      expect(() => compileModelFilter('Author', schema)).toThrow('has no opposite')
+    })
   })
 
   describe('nULL handling', () => {

@@ -250,13 +250,13 @@ Relation traversal uses `resolveRelationChain` at line 269. The existing `author
 Use the `model()`, `field()`, `makeSchema()` helpers at `test/index.test.ts:19-64` to build fixtures.
 For auth-dependent inner conditions, use `E.member(E.call('auth'), ['id'])` inside the collection predicate.
 
-- [ ] Add unit test: `some` (`?`) with auth-dependent inner condition: `posts?[authorId == auth().id]` → subquery with auth param
-- [ ] Add unit test: `some` with compound inner condition: `posts?[published == true && status == 'LIVE']` → subquery with AND
-- [ ] Add unit test: collection predicate with `true` inner condition → subquery without WHERE clause
-- [ ] Add unit test: collection predicate on non-relation field → error `is not a relation`
-- [ ] Add unit test: two separate relation traversals ANDed: `a.x == 'foo' && b.y == 'bar'` → two subqueries with AND
-- [ ] Add unit test: self-referential relation: `User { managerId → User, @@allow(manager.name == auth().name) }`
-- [ ] Add unit test: collection predicate on relation without `opposite` → error `has no opposite`
+- [x] Add unit test: `some` (`?`) with auth-dependent inner condition: `posts?[authorId == auth().id]` → subquery with auth param
+- [x] Add unit test: `some` with compound inner condition: `posts?[published == true && status == 'LIVE']` → subquery with AND
+- [x] Add unit test: collection predicate with `true` inner condition → subquery without WHERE clause
+- [x] Add unit test: collection predicate on non-relation field → error `is not a relation`
+- [x] Add unit test: two separate relation traversals ANDed: `a.x == 'foo' && b.y == 'bar'` → two subqueries with AND
+- [x] Add unit test: self-referential relation: `User { managerId → User, @@allow(manager.name == auth().name) }`
+- [x] Add unit test: collection predicate on relation without `opposite` → error `has no opposite`
 
 **Files:** `test/index.test.ts`
 
