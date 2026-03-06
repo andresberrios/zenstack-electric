@@ -458,14 +458,38 @@ describe('compileModelFilter', () => {
   })
 
   describe('nULL handling', () => {
-    it('compiles comparison with null', () => {
+    it('compiles field == null to IS NULL', () => {
       const schema = makeSchema(
         model('User', [field('id'), field('deletedAt')], [
           allow(E.binary(E.field('deletedAt'), '==', E._null())),
         ]),
       )
       expect(compileModelFilter('User', schema)).toEqual({
-        where: '"deletedAt" = NULL',
+        where: '"deletedAt" IS NULL',
+        params: [],
+      })
+    })
+
+    it('compiles field != null to IS NOT NULL', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('deletedAt')], [
+          allow(E.binary(E.field('deletedAt'), '!=', E._null())),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"deletedAt" IS NOT NULL',
+        params: [],
+      })
+    })
+
+    it('compiles null == field (reversed) to IS NULL', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('deletedAt')], [
+          allow(E.binary(E._null(), '==', E.field('deletedAt'))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"deletedAt" IS NULL',
         params: [],
       })
     })

@@ -255,6 +255,16 @@ function compileComparison(
     return buildRelationSubquery(rSide.relationChain!, sqlOp, lSide.sql, true)
   }
 
+  // NULL comparisons require IS NULL / IS NOT NULL in SQL
+  if (lSide.sql === 'NULL' || rSide.sql === 'NULL') {
+    const fieldSide = lSide.sql === 'NULL' ? rSide.sql : lSide.sql
+    if (sqlOp === '=')
+      return `${fieldSide} IS NULL`
+    if (sqlOp === '!=')
+      return `${fieldSide} IS NOT NULL`
+    throw new Error(`Cannot use operator "${op}" with NULL in policy for model ${model}`)
+  }
+
   return `${lSide.sql} ${sqlOp} ${rSide.sql}`
 }
 
