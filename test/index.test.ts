@@ -1,6 +1,6 @@
 import type { SchemaDef } from '@zenstackhq/schema'
 import { describe, expect, it } from 'vitest'
-import { compilePolicyWhere } from '../src/index'
+import { compileModelFilter, resolveShapeFilter } from '../src/index'
 
 // ---------------------------------------------------------------------------
 // Helpers to build minimal schema fixtures
@@ -67,22 +67,22 @@ function makeSchema(...models: ReturnType<typeof model>[]): SchemaDef {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('compilePolicyWhere', () => {
+describe('compileModelFilter', () => {
   describe('basic policies', () => {
     it('returns null for @@allow(all, true)', () => {
       const schema = makeSchema(
         model('User', [field('id')], [allow(E.literal(true))]),
       )
-      expect(compilePolicyWhere('User', schema)).toBeNull()
+      expect(compileModelFilter('User', schema)).toBeNull()
     })
 
     it('returns { where: "false" } when no allow rules exist', () => {
       const schema = makeSchema(
         model('User', [field('id')], []),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: 'false',
-        params: {},
+        params: [],
       })
     })
 
@@ -90,15 +90,15 @@ describe('compilePolicyWhere', () => {
       const schema = makeSchema(
         model('User', [field('id')], [allow(E.literal(false))]),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: 'false',
-        params: {},
+        params: [],
       })
     })
 
     it('throws for unknown model', () => {
       const schema = makeSchema()
-      expect(() => compilePolicyWhere('Nope', schema)).toThrow('Unknown model: Nope')
+      expect(() => compileModelFilter('Nope', schema)).toThrow('Unknown model: Nope')
     })
   })
 
@@ -109,9 +109,9 @@ describe('compilePolicyWhere', () => {
           allow(E.binary(E.field('status'), '==', E.literal('ACTIVE'))),
         ]),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: '"status" = $1',
-        params: { 1: 'ACTIVE' },
+        params: [{ kind: 'static', value: 'ACTIVE' }],
       })
     })
 
@@ -121,9 +121,9 @@ describe('compilePolicyWhere', () => {
           allow(E.binary(E.field('status'), '!=', E.literal('DELETED'))),
         ]),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: '"status" != $1',
-        params: { 1: 'DELETED' },
+        params: [{ kind: 'static', value: 'DELETED' }],
       })
     })
 
@@ -133,59 +133,47 @@ describe('compilePolicyWhere', () => {
           allow(E.binary(E.field('price'), '>', E.literal(0))),
         ]),
       )
-      expect(compilePolicyWhere('Item', schema)).toEqual({
+      expect(compileModelFilter('Item', schema)).toEqual({
         where: '"price" > $1',
-        params: { 1: '0' },
+        params: [{ kind: 'static', value: '0' }],
       })
     })
   })
 
   describe('field == auth()', () => {
-    it('compiles field compared to auth().email', () => {
+    it('records auth path for auth().email', () => {
       const schema = makeSchema(
         model('Post', [field('id'), field('email')], [
           allow(E.binary(E.field('email'), '==', E.member(E.call('auth'), ['email']))),
         ]),
       )
-      expect(compilePolicyWhere('Post', schema, { email: 'a@b.com' })).toEqual({
+      expect(compileModelFilter('Post', schema)).toEqual({
         where: '"email" = $1',
-        params: { 1: 'a@b.com' },
+        params: [{ kind: 'auth', path: ['email'] }],
       })
     })
 
-    it('compiles auth() on left side', () => {
+    it('records auth path on left side', () => {
       const schema = makeSchema(
         model('Post', [field('id'), field('ownerId')], [
           allow(E.binary(E.member(E.call('auth'), ['id']), '==', E.field('ownerId'))),
         ]),
       )
-      expect(compilePolicyWhere('Post', schema, { id: 'user-1' })).toEqual({
+      expect(compileModelFilter('Post', schema)).toEqual({
         where: '$1 = "ownerId"',
-        params: { 1: 'user-1' },
+        params: [{ kind: 'auth', path: ['id'] }],
       })
     })
 
-    it('resolves nested auth path', () => {
+    it('records nested auth path', () => {
       const schema = makeSchema(
         model('Post', [field('id'), field('orgId')], [
           allow(E.binary(E.field('orgId'), '==', E.member(E.call('auth'), ['org', 'id']))),
         ]),
       )
-      expect(compilePolicyWhere('Post', schema, { org: { id: 'org-1' } })).toEqual({
+      expect(compileModelFilter('Post', schema)).toEqual({
         where: '"orgId" = $1',
-        params: { 1: 'org-1' },
-      })
-    })
-
-    it('handles undefined auth gracefully', () => {
-      const schema = makeSchema(
-        model('Post', [field('id'), field('email')], [
-          allow(E.binary(E.field('email'), '==', E.member(E.call('auth'), ['email']))),
-        ]),
-      )
-      expect(compilePolicyWhere('Post', schema)).toEqual({
-        where: '"email" = $1',
-        params: { 1: '' },
+        params: [{ kind: 'auth', path: ['org', 'id'] }],
       })
     })
   })
@@ -214,9 +202,9 @@ describe('compilePolicyWhere', () => {
           E.member(E.call('auth'), ['email']),
         ),
       )
-      expect(compilePolicyWhere('Contract', schema, { email: 'a@b.com' })).toEqual({
+      expect(compileModelFilter('Contract', schema)).toEqual({
         where: '"clientId" IN (SELECT "id" FROM "Client" WHERE "contactEmail" = $1)',
-        params: { 1: 'a@b.com' },
+        params: [{ kind: 'auth', path: ['email'] }],
       })
     })
 
@@ -228,9 +216,9 @@ describe('compilePolicyWhere', () => {
           E.literal('test@test.com'),
         ),
       )
-      expect(compilePolicyWhere('Contract', schema)).toEqual({
+      expect(compileModelFilter('Contract', schema)).toEqual({
         where: '"clientId" IN (SELECT "id" FROM "Client" WHERE "contactEmail" = $1)',
-        params: { 1: 'test@test.com' },
+        params: [{ kind: 'static', value: 'test@test.com' }],
       })
     })
 
@@ -242,9 +230,9 @@ describe('compilePolicyWhere', () => {
           E.member(E.field('client'), ['contactEmail']),
         ),
       )
-      expect(compilePolicyWhere('Contract', schema, { email: 'a@b.com' })).toEqual({
+      expect(compileModelFilter('Contract', schema)).toEqual({
         where: '"clientId" IN (SELECT "id" FROM "Client" WHERE $1 = "contactEmail")',
-        params: { 1: 'a@b.com' },
+        params: [{ kind: 'auth', path: ['email'] }],
       })
     })
 
@@ -266,7 +254,7 @@ describe('compilePolicyWhere', () => {
           )),
         ]),
       )
-      expect(() => compilePolicyWhere('C', schema)).toThrow(
+      expect(() => compileModelFilter('C', schema)).toThrow(
         'compares two relation paths',
       )
     })
@@ -296,9 +284,9 @@ describe('compilePolicyWhere', () => {
           )),
         ]),
       )
-      expect(compilePolicyWhere('ContractSite', schema, { email: 'a@b.com' })).toEqual({
+      expect(compileModelFilter('ContractSite', schema)).toEqual({
         where: '"contractId" IN (SELECT "id" FROM "Contract" WHERE "clientId" IN (SELECT "id" FROM "Client" WHERE "contactEmail" = $1))',
-        params: { 1: 'a@b.com' },
+        params: [{ kind: 'auth', path: ['email'] }],
       })
     })
   })
@@ -314,9 +302,12 @@ describe('compilePolicyWhere', () => {
           )),
         ]),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: '("status" = $1) AND ("role" = $2)',
-        params: { 1: 'ACTIVE', 2: 'ADMIN' },
+        params: [
+          { kind: 'static', value: 'ACTIVE' },
+          { kind: 'static', value: 'ADMIN' },
+        ],
       })
     })
 
@@ -330,9 +321,12 @@ describe('compilePolicyWhere', () => {
           )),
         ]),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: '("status" = $1) OR ("status" = $2)',
-        params: { 1: 'ACTIVE', 2: 'PENDING' },
+        params: [
+          { kind: 'static', value: 'ACTIVE' },
+          { kind: 'static', value: 'PENDING' },
+        ],
       })
     })
 
@@ -346,9 +340,9 @@ describe('compilePolicyWhere', () => {
           )),
         ]),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: '"status" = $1',
-        params: { 1: 'ACTIVE' },
+        params: [{ kind: 'static', value: 'ACTIVE' }],
       })
     })
 
@@ -362,7 +356,7 @@ describe('compilePolicyWhere', () => {
           )),
         ]),
       )
-      expect(compilePolicyWhere('User', schema)).toBeNull()
+      expect(compileModelFilter('User', schema)).toBeNull()
     })
 
     it('compiles NOT', () => {
@@ -371,9 +365,7 @@ describe('compilePolicyWhere', () => {
           allow(E.unary('!', E.binary(E.field('deleted'), '==', E.literal(true)))),
         ]),
       )
-      // NOT (literal true inside ==) — the inner `true` is a literal value, not "allow all"
-      // E.literal(true) in a comparison context becomes a param
-      const result = compilePolicyWhere('User', schema)
+      const result = compileModelFilter('User', schema)
       expect(result).toBeTruthy()
       expect(result!.where).toContain('NOT')
     })
@@ -384,9 +376,9 @@ describe('compilePolicyWhere', () => {
           allow(E.unary('!', E.literal(true))),
         ]),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: 'false',
-        params: {},
+        params: [],
       })
     })
   })
@@ -399,9 +391,12 @@ describe('compilePolicyWhere', () => {
           allow(E.binary(E.field('ownerId'), '==', E.member(E.call('auth'), ['id']))),
         ]),
       )
-      expect(compilePolicyWhere('Post', schema, { id: 'user-1' })).toEqual({
+      expect(compileModelFilter('Post', schema)).toEqual({
         where: '("status" = $1) OR ("ownerId" = $2)',
-        params: { 1: 'PUBLIC', 2: 'user-1' },
+        params: [
+          { kind: 'static', value: 'PUBLIC' },
+          { kind: 'auth', path: ['id'] },
+        ],
       })
     })
 
@@ -412,7 +407,7 @@ describe('compilePolicyWhere', () => {
           allow(E.literal(true)),
         ]),
       )
-      expect(compilePolicyWhere('Post', schema)).toBeNull()
+      expect(compileModelFilter('Post', schema)).toBeNull()
     })
   })
 
@@ -435,30 +430,29 @@ describe('compilePolicyWhere', () => {
     }
 
     it('compiles some (?) predicate', () => {
-      // literal(true) in a comparison context compiles to SQL `true` (not a param)
       const schema = authorPostSchema('?', E.binary(E.field('published'), '==', E.literal(true)))
-      const result = compilePolicyWhere('Author', schema)
+      const result = compileModelFilter('Author', schema)
       expect(result).toEqual({
         where: '"id" IN (SELECT "authorId" FROM "Post" WHERE "published" = true)',
-        params: {},
+        params: [],
       })
     })
 
     it('compiles none (^) predicate', () => {
       const schema = authorPostSchema('^', E.binary(E.field('published'), '==', E.literal(true)))
-      const result = compilePolicyWhere('Author', schema)
+      const result = compileModelFilter('Author', schema)
       expect(result).toEqual({
         where: '"id" NOT IN (SELECT "authorId" FROM "Post" WHERE "published" = true)',
-        params: {},
+        params: [],
       })
     })
 
     it('compiles every (!) predicate', () => {
       const schema = authorPostSchema('!', E.binary(E.field('published'), '==', E.literal(true)))
-      const result = compilePolicyWhere('Author', schema)
+      const result = compileModelFilter('Author', schema)
       expect(result).toEqual({
         where: '"id" NOT IN (SELECT "authorId" FROM "Post" WHERE NOT ("published" = true))',
-        params: {},
+        params: [],
       })
     })
   })
@@ -470,9 +464,9 @@ describe('compilePolicyWhere', () => {
           allow(E.binary(E.field('deletedAt'), '==', E._null())),
         ]),
       )
-      expect(compilePolicyWhere('User', schema)).toEqual({
+      expect(compileModelFilter('User', schema)).toEqual({
         where: '"deletedAt" = NULL',
-        params: {},
+        params: [],
       })
     })
   })
@@ -498,10 +492,13 @@ describe('compilePolicyWhere', () => {
           )),
         ]),
       )
-      const result = compilePolicyWhere('Post', schema, { email: 'test@test.com' })
+      const result = compileModelFilter('Post', schema)
       expect(result).toEqual({
         where: '("status" = $1) AND ("clientId" IN (SELECT "id" FROM "Client" WHERE "contactEmail" = $2))',
-        params: { 1: 'ACTIVE', 2: 'test@test.com' },
+        params: [
+          { kind: 'static', value: 'ACTIVE' },
+          { kind: 'auth', path: ['email'] },
+        ],
       })
     })
   })
@@ -513,7 +510,7 @@ describe('compilePolicyWhere', () => {
           allow({ kind: 'something_weird' }),
         ]),
       )
-      expect(() => compilePolicyWhere('User', schema)).toThrow('Unsupported expression kind')
+      expect(() => compileModelFilter('User', schema)).toThrow('Unsupported expression kind')
     })
 
     it('throws for bare auth() without member access', () => {
@@ -522,7 +519,7 @@ describe('compilePolicyWhere', () => {
           allow(E.call('auth')),
         ]),
       )
-      expect(() => compilePolicyWhere('User', schema)).toThrow('auth() must be used with member access')
+      expect(() => compileModelFilter('User', schema)).toThrow('auth() must be used with member access')
     })
 
     it('throws for unsupported function call', () => {
@@ -531,7 +528,7 @@ describe('compilePolicyWhere', () => {
           allow(E.call('now')),
         ]),
       )
-      expect(() => compilePolicyWhere('User', schema)).toThrow('Unsupported function call "now"')
+      expect(() => compileModelFilter('User', schema)).toThrow('Unsupported function call "now"')
     })
 
     it('throws for relation without fields/references', () => {
@@ -548,7 +545,7 @@ describe('compilePolicyWhere', () => {
           )),
         ]),
       )
-      expect(() => compilePolicyWhere('User', schema)).toThrow('has no fields/references')
+      expect(() => compileModelFilter('User', schema)).toThrow('has no fields/references')
     })
 
     it('throws for standalone relation member access', () => {
@@ -562,7 +559,82 @@ describe('compilePolicyWhere', () => {
           allow(E.member(E.field('related'), ['name'])),
         ]),
       )
-      expect(() => compilePolicyWhere('User', schema)).toThrow('cannot be used standalone')
+      expect(() => compileModelFilter('User', schema)).toThrow('cannot be used standalone')
+    })
+  })
+})
+
+describe('resolveShapeFilter', () => {
+  it('returns null for null def', () => {
+    expect(resolveShapeFilter(null)).toBeNull()
+  })
+
+  it('resolves static params', () => {
+    const def = {
+      where: '"status" = $1',
+      params: [{ kind: 'static' as const, value: 'ACTIVE' }],
+    }
+    expect(resolveShapeFilter(def)).toEqual({
+      where: '"status" = $1',
+      params: { 1: 'ACTIVE' },
+    })
+  })
+
+  it('resolves auth params from auth object', () => {
+    const def = {
+      where: '"email" = $1',
+      params: [{ kind: 'auth' as const, path: ['email'] }],
+    }
+    expect(resolveShapeFilter(def, { email: 'a@b.com' })).toEqual({
+      where: '"email" = $1',
+      params: { 1: 'a@b.com' },
+    })
+  })
+
+  it('resolves nested auth paths', () => {
+    const def = {
+      where: '"orgId" = $1',
+      params: [{ kind: 'auth' as const, path: ['org', 'id'] }],
+    }
+    expect(resolveShapeFilter(def, { org: { id: 'org-1' } })).toEqual({
+      where: '"orgId" = $1',
+      params: { 1: 'org-1' },
+    })
+  })
+
+  it('resolves mixed static and auth params', () => {
+    const def = {
+      where: '("status" = $1) OR ("ownerId" = $2)',
+      params: [
+        { kind: 'static' as const, value: 'PUBLIC' },
+        { kind: 'auth' as const, path: ['id'] },
+      ],
+    }
+    expect(resolveShapeFilter(def, { id: 'user-1' })).toEqual({
+      where: '("status" = $1) OR ("ownerId" = $2)',
+      params: { 1: 'PUBLIC', 2: 'user-1' },
+    })
+  })
+
+  it('returns empty string for missing auth values', () => {
+    const def = {
+      where: '"email" = $1',
+      params: [{ kind: 'auth' as const, path: ['email'] }],
+    }
+    expect(resolveShapeFilter(def)).toEqual({
+      where: '"email" = $1',
+      params: { 1: '' },
+    })
+  })
+
+  it('returns empty string for null in auth path', () => {
+    const def = {
+      where: '"orgId" = $1',
+      params: [{ kind: 'auth' as const, path: ['org', 'id'] }],
+    }
+    expect(resolveShapeFilter(def, { org: null })).toEqual({
+      where: '"orgId" = $1',
+      params: { 1: '' },
     })
   })
 })

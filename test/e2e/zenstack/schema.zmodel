@@ -1,0 +1,43 @@
+datasource db {
+  provider = "postgresql"
+  url = "postgresql://postgres:password@localhost:5432/zenstack-electric"
+}
+
+plugin policy {
+  provider = '@zenstackhq/plugin-policy'
+}
+
+plugin electric {
+  provider = '../../../src/index.ts'
+  output = 'test/e2e/zenstack/electric-filters.ts'
+}
+
+model User {
+  id    String @id
+  email String
+
+  @@auth
+}
+
+model PublicPost {
+  id    Int    @id @default(autoincrement())
+  title String
+
+  @@allow('read', true)
+}
+
+model ActiveRecord {
+  id     Int    @id @default(autoincrement())
+  name   String
+  status String
+
+  @@allow('read', status == 'ACTIVE')
+}
+
+model OwnedRecord {
+  id      Int    @id @default(autoincrement())
+  title   String
+  ownerId String
+
+  @@allow('read', ownerId == auth().id)
+}

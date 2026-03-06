@@ -39,20 +39,28 @@
     "release": "bumpp",
     "start": "tsx src/index.ts",
     "test": "vitest",
+    "test:e2e": "vitest run test/e2e/",
     "typecheck": "tsc",
     "prepare": "simple-git-hooks"
   },
   "dependencies": {
-    "@zenstackhq/schema": "^3.4.4"
+    "@zenstackhq/schema": "^3.4.4",
+    "@zenstackhq/sdk": "^3.4.4"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.6.1",
     "@antfu/ni": "^28.0.0",
     "@antfu/utils": "^9.3.0",
+    "@electric-sql/client": "^1.5.11",
     "@types/node": "^25.0.1",
+    "@types/pg": "^8.18.0",
+    "@zenstackhq/cli": "^3.4.4",
+    "@zenstackhq/orm": "^3.4.4",
+    "@zenstackhq/plugin-policy": "^3.4.4",
     "bumpp": "^10.3.2",
     "eslint": "^9.39.2",
     "lint-staged": "^16.2.7",
+    "pg": "^8.20.0",
     "publint": "^0.3.16",
     "simple-git-hooks": "^2.13.1",
     "tinyexec": "^1.0.2",
