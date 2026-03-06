@@ -1,7 +1,7 @@
 {
   "name": "zenstack-electric",
   "type": "module",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "packageManager": "pnpm@10.30.3",
   "description": "Compile ZenStack access policies into Electric SQL shape filters",
   "author": "Andres Berrios",
