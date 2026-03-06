@@ -295,12 +295,12 @@ output string.
 
 **Prefer a new file** `test/codegen.test.ts` to keep it separate from the compile/runtime tests.
 
-- [ ] Create `test/codegen.test.ts` with imports from `src/codegen.ts`
-- [ ] Add test: `generateFiltersSource({})` → valid source with empty `shapeFilterDefs` map
-- [ ] Add test: mix of null and non-null filters → correct source output
-- [ ] Add test: `where` clause with quotes and backslashes → survives `JSON.stringify` round-trip
-- [ ] Add test: generated source contains `throw new Error(\`Unknown model: \${model}\`)` for unknown model
-- [ ] Add test: static params and auth params serialized correctly
+- [x] Create `test/codegen.test.ts` with imports from `src/codegen.ts`
+- [x] Add test: `generateFiltersSource({})` → valid source with empty `shapeFilterDefs` map
+- [x] Add test: mix of null and non-null filters → correct source output
+- [x] Add test: `where` clause with quotes and backslashes → survives `JSON.stringify` round-trip
+- [x] Add test: generated source contains `throw new Error(\`Unknown model: \${model}\`)` for unknown model
+- [x] Add test: static params and auth params serialized correctly
 
 **Files:** `test/codegen.test.ts` (new file)
 
