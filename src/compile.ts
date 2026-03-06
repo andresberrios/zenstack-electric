@@ -351,6 +351,12 @@ function resolveRelationChain(
     )
   }
 
+  if (fieldDef.relation.fields.length > 1 || fieldDef.relation.references.length > 1) {
+    throw new Error(
+      `Relation "${relationField}" on ${currentModel} has composite foreign keys — this is not supported by Electric shape filters`,
+    )
+  }
+
   const fk = fieldDef.relation.fields[0]!
   const pk = fieldDef.relation.references[0]!
   const relatedModel = fieldDef.type
@@ -411,6 +417,12 @@ function compileCollectionPredicate(
   if (!oppositeFieldDef?.relation?.fields?.length || !oppositeFieldDef.relation.references?.length) {
     throw new Error(
       `Opposite relation "${oppositeField}" on ${relatedModel} has no fields/references`,
+    )
+  }
+
+  if (oppositeFieldDef.relation.fields.length > 1 || oppositeFieldDef.relation.references.length > 1) {
+    throw new Error(
+      `Opposite relation "${oppositeField}" on ${relatedModel} has composite foreign keys — this is not supported by Electric shape filters`,
     )
   }
 

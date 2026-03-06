@@ -207,10 +207,10 @@ Same issue in `compileCollectionPredicate` at `src/compile.ts:346-347` for `oppo
 **Fix:** Add a check before accessing `[0]` — if `fields.length > 1` or `references.length > 1`,
 throw with a clear message. This is better than silently producing wrong SQL.
 
-- [ ] In `resolveRelationChain`, throw if `fields.length > 1` or `references.length > 1`
-- [ ] In `compileCollectionPredicate`, same check for opposite relation FK
-- [ ] Add unit test: relation with `fields: ['a', 'b'], references: ['x', 'y']` throws descriptive error
-- [ ] Add unit test: collection predicate with composite opposite FK throws
+- [x] In `resolveRelationChain`, throw if `fields.length > 1` or `references.length > 1`
+- [x] In `compileCollectionPredicate`, same check for opposite relation FK
+- [x] Add unit test: relation with `fields: ['a', 'b'], references: ['x', 'y']` throws descriptive error
+- [x] Add unit test: collection predicate with composite opposite FK throws
 
 **Files:** `src/compile.ts`, `test/index.test.ts`
 

@@ -833,6 +833,44 @@ describe('compileModelFilter', () => {
       expect(() => compileModelFilter('User', schema)).toThrow('has no fields/references')
     })
 
+    it('throws for relation with composite foreign keys', () => {
+      const schema = makeSchema(
+        model('Related', [field('id'), field('name')]),
+        model('User', [
+          field('id'),
+          field('relatedA'),
+          field('relatedB'),
+          field('related', { type: 'Related', relation: { fields: ['relatedA', 'relatedB'], references: ['id', 'name'] } }),
+        ], [
+          allow(E.binary(
+            E.member(E.field('related'), ['name']),
+            '==',
+            E.literal('test'),
+          )),
+        ]),
+      )
+      expect(() => compileModelFilter('User', schema)).toThrow('composite foreign keys')
+    })
+
+    it('throws for collection predicate with composite opposite FK', () => {
+      const schema = makeSchema(
+        model('Post', [
+          field('id'),
+          field('authorA'),
+          field('authorB'),
+          field('author', { type: 'Author', relation: { fields: ['authorA', 'authorB'], references: ['id', 'name'], opposite: 'posts' } }),
+        ]),
+        model('Author', [
+          field('id'),
+          field('name'),
+          field('posts', { type: 'Post', array: true, relation: { opposite: 'author' } }),
+        ], [
+          allow(E.binary(E.field('posts'), '?', E.binary(E.field('id'), '==', E.literal('x')))),
+        ]),
+      )
+      expect(() => compileModelFilter('Author', schema)).toThrow('composite foreign keys')
+    })
+
     it('throws for standalone relation member access', () => {
       const schema = makeSchema(
         model('Related', [field('id'), field('name')]),
