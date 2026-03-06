@@ -354,14 +354,14 @@ for each model to verify correct filtering.
 
 **Electric shape API reference:** https://electric-sql.com/docs/guides/shapes
 
-- [ ] Add seed data for all new models in `beforeAll` (clean + create)
-- [ ] Test `AndFilterRecord`: seed 3 rows (both true, one false, both false) → only 1 returned
-- [ ] Test `MultiPolicyPost`: seed public + private rows → public visible to all, private to owner only
-- [ ] Test `NotDeletedRecord`: seed deleted + non-deleted → only non-deleted returned
-- [ ] Test `DenyDeletedPost`: seed deleted + non-deleted → deny overrides allow, only non-deleted returned
-- [ ] Test `NullableRecord`: seed rows with null + non-null `deletedAt` → only null returned
-- [ ] Test `NumericRecord`: seed rows with price > 0, = 0, < 0 → only price > 0 returned
-- [ ] Test `CreateOnlyRecord`: `getShapeFilter` returns `{ where: 'false' }` (no Electric query needed)
+- [x] Add seed data for all new models in `beforeAll` (clean + create)
+- [x] Test `AndFilterRecord`: seed 3 rows (both true, one false, both false) → only 1 returned
+- [x] Test `MultiPolicyPost`: seed public + private rows → public visible to all, private to owner only
+- [x] Test `NotDeletedRecord`: seed deleted + non-deleted → only non-deleted returned
+- [x] Test `DenyDeletedPost`: seed deleted + non-deleted → deny overrides allow, only non-deleted returned
+- [x] Test `NullableRecord`: seed rows with null + non-null `deletedAt` → only null returned
+- [x] Test `NumericRecord`: seed rows with price > 0, = 0, < 0 → only price > 0 returned
+- [x] Test `CreateOnlyRecord`: `getShapeFilter` returns `{ where: 'false' }` (no Electric query needed)
 
 **Files:** `test/e2e/e2e.test.ts`
 
