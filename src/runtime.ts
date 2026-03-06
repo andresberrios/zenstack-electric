@@ -8,7 +8,7 @@ import type { ShapeFilter, ShapeFilterDef } from './types'
  */
 export function resolveShapeFilter(
   def: ShapeFilterDef | null,
-  auth?: Record<string, unknown>,
+  auth?: Record<string, any>,
 ): ShapeFilter | null {
   if (def === null)
     return null

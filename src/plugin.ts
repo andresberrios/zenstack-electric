@@ -1,7 +1,7 @@
 import type { CliPlugin } from '@zenstackhq/sdk'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { astToSchemaDef } from './ast-transform'
+import { astToSchemaDef, extractAuthModel } from './ast-transform'
 import { generateFiltersSource } from './codegen'
 import { compileAllFilters } from './compile'
 
@@ -15,8 +15,9 @@ export default {
       : join(defaultOutputPath, 'electric-filters.ts')
 
     const schemaDef = astToSchemaDef(model)
+    const authModel = extractAuthModel(model)
     const filters = compileAllFilters(schemaDef)
-    const source = generateFiltersSource(filters)
+    const source = generateFiltersSource(filters, authModel)
 
     writeFileSync(outputFile, source, 'utf-8')
   },

@@ -15,6 +15,63 @@ import type {
   UnaryExpr,
 } from '@zenstackhq/sdk/ast'
 
+export interface AuthFieldInfo {
+  name: string
+  type: string
+  optional: boolean
+}
+
+export interface AuthModelInfo {
+  name: string
+  fields: AuthFieldInfo[]
+}
+
+const zmodelToTsType: Record<string, string> = {
+  String: 'string',
+  Int: 'number',
+  Float: 'number',
+  Boolean: 'boolean',
+  BigInt: 'bigint',
+  DateTime: 'Date',
+  Decimal: 'number',
+  Json: 'unknown',
+  Bytes: 'Buffer',
+}
+
+/**
+ * Find the model annotated with `@@auth()` and extract its scalar fields
+ * with their TypeScript types, for use in generated type definitions.
+ */
+export function extractAuthModel(model: Model): AuthModelInfo | null {
+  for (const decl of model.declarations) {
+    if (decl.$type !== 'DataModel')
+      continue
+    const dm = decl as DataModel
+    const hasAuth = dm.attributes.some(a => a.decl.ref?.name === '@@auth')
+    if (!hasAuth)
+      continue
+
+    const fields: AuthFieldInfo[] = []
+    for (const field of dm.fields) {
+      // Skip relation fields (they reference other DataModels)
+      if (field.type.reference?.ref?.$type === 'DataModel')
+        continue
+
+      const zmodelType = field.type.reference?.ref?.name ?? field.type.type ?? 'String'
+      const tsType = zmodelToTsType[zmodelType] ?? 'string'
+
+      fields.push({
+        name: field.name,
+        type: tsType,
+        optional: field.type.optional || false,
+      })
+    }
+
+    return { name: dm.name, fields }
+  }
+  return null
+}
+
 /**
  * Convert a ZModel AST (as received by a CLI plugin) into a minimal SchemaDef
  * suitable for our compilation engine. Only extracts what we need: models,

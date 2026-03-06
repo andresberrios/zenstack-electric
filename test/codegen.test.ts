@@ -122,4 +122,37 @@ describe('generateFiltersSource', () => {
     expect(source).toContain(`{ kind: 'static', value: "ACTIVE" },`)
     expect(source).toContain(`{ kind: 'auth', path: ["id"] },`)
   })
+
+  it('generates AuthModelType interface when authModel is provided', () => {
+    const source = generateFiltersSource({}, {
+      name: 'User',
+      fields: [
+        { name: 'id', type: 'string', optional: false },
+        { name: 'email', type: 'string', optional: false },
+        { name: 'name', type: 'string', optional: true },
+        { name: 'role', type: 'string', optional: false },
+      ],
+    })
+
+    expect(source).toContain('export interface AuthModelType {')
+    expect(source).toContain('  id: string')
+    expect(source).toContain('  email: string')
+    expect(source).toContain('  name?: string')
+    expect(source).toContain('  role: string')
+    expect(source).toContain('auth?: Partial<AuthModelType>')
+  })
+
+  it('uses Record<string, any> when no authModel is provided', () => {
+    const source = generateFiltersSource({})
+
+    expect(source).not.toContain('AuthModelType')
+    expect(source).toContain('auth?: Record<string, any>')
+  })
+
+  it('does not generate AuthModelType when authModel is null', () => {
+    const source = generateFiltersSource({}, null)
+
+    expect(source).not.toContain('AuthModelType')
+    expect(source).toContain('auth?: Record<string, any>')
+  })
 })
