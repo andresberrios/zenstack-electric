@@ -313,4 +313,29 @@ describe('electric shape filters (e2e)', () => {
     expect(filter).not.toBeNull()
     expect(filter!.where).toBe('false')
   })
+
+  it('teamProject: auth with teamName Alpha returns only Alpha projects', async () => {
+    const filter = getShapeFilter('TeamProject', { teamName: 'Alpha' })
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('TeamProject', filter)
+    expect(rows).toHaveLength(2)
+    expect(rows.every(r => r.name!.startsWith('Alpha'))).toBe(true)
+  })
+
+  it('teamProject: auth with non-existent teamName returns 0 rows', async () => {
+    const filter = getShapeFilter('TeamProject', { teamName: 'NonExistent' })
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('TeamProject', filter)
+    expect(rows).toHaveLength(0)
+  })
+
+  it('teamProject: no auth returns 0 rows', async () => {
+    const filter = getShapeFilter('TeamProject')
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('TeamProject', filter)
+    expect(rows).toHaveLength(0)
+  })
 })

@@ -377,11 +377,11 @@ will need the relation correctly set up — use `teamId` FK directly in `createM
 **Electric parameterized shapes:** The filter params are passed as `whereParams` array to
 Electric's shape API. See `queryElectricShape` helper at `test/e2e/e2e.test.ts:25-50`.
 
-- [ ] Seed `Team` data: at least 2 teams ('Alpha', 'Beta')
-- [ ] Seed `TeamProject` data: 2+ projects per team
-- [ ] Test: `auth = { teamName: 'Alpha' }` → returns only Alpha's projects
-- [ ] Test: `auth = { teamName: 'NonExistent' }` → returns 0 rows
-- [ ] Test: no auth → returns 0 rows (auth param resolves to empty string)
+- [x] Seed `Team` data: at least 2 teams ('Alpha', 'Beta')
+- [x] Seed `TeamProject` data: 2+ projects per team
+- [x] Test: `auth = { teamName: 'Alpha' }` → returns only Alpha's projects
+- [x] Test: `auth = { teamName: 'NonExistent' }` → returns 0 rows
+- [x] Test: no auth → returns 0 rows (auth param resolves to empty string)
 
 **Files:** `test/e2e/e2e.test.ts`
 
