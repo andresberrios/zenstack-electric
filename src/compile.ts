@@ -41,11 +41,12 @@ const OP_MAP: Record<string, string> = {
 }
 
 /**
- * Compile ZenStack @@allow policies for a model into an Electric-compatible
- * ShapeFilterDef with parameterized auth paths.
+ * Compile ZenStack @@allow and @@deny policies for a model into an
+ * Electric-compatible ShapeFilterDef with parameterized auth paths.
  *
- * Returns `null` if the model has no restrictions (e.g. `@@allow('all', true)`).
- * Returns `{ where: 'false', params: [] }` if the model has no allow rules (deny all).
+ * Semantics: `(NOT (deny1 OR deny2 ...)) AND (allow1 OR allow2 ...)`.
+ * Returns `null` if the model has no restrictions (e.g. `@@allow('all', true)` with no deny).
+ * Returns `{ where: 'false', params: [] }` if the model has no allow rules or an unconditional deny.
  */
 export function compileModelFilter(
   modelName: string,
@@ -58,14 +59,35 @@ export function compileModelFilter(
   const allowRules = (model.attributes ?? []).filter(
     a => a.name === '@@allow',
   )
+  const denyRules = (model.attributes ?? []).filter(
+    a => a.name === '@@deny',
+  )
 
   if (allowRules.length === 0) {
     return { where: 'false', params: [] }
   }
 
   const ctx: CompileContext = { schema, params: [] }
-  const conditions: string[] = []
 
+  // Compile @@deny conditions first
+  const denyConditions: string[] = []
+  for (const rule of denyRules) {
+    const conditionArg = rule.args?.find(a => a.name === 'condition')
+    if (!conditionArg)
+      continue
+    const compiled = compileExpression(conditionArg.value, modelName, ctx)
+    if (compiled === null) {
+      // Unconditional deny (condition = true) → deny everything
+      return { where: 'false', params: [] }
+    }
+    if (compiled !== 'false') {
+      denyConditions.push(compiled)
+    }
+  }
+
+  // Compile @@allow conditions
+  const allowConditions: string[] = []
+  const paramsBeforeAllow = ctx.params.length
   for (const rule of allowRules) {
     const conditionArg = rule.args?.find(a => a.name === 'condition')
     if (!conditionArg)
@@ -73,20 +95,36 @@ export function compileModelFilter(
 
     const compiled = compileExpression(conditionArg.value, modelName, ctx)
     if (compiled === null) {
-      return null
+      // Unconditional allow — discard collected allow conditions and their params
+      ctx.params.length = paramsBeforeAllow
+      allowConditions.length = 0
+      break
     }
-    conditions.push(compiled)
+    allowConditions.push(compiled)
   }
 
-  if (conditions.length === 0)
-    return null
+  // Build allow WHERE part
+  const allowWhere = allowConditions.length > 0
+    ? allowConditions.length === 1
+      ? allowConditions[0]!
+      : allowConditions.map(c => `(${c})`).join(' OR ')
+    : null
 
-  const where
-    = conditions.length === 1
-      ? conditions[0]!
-      : conditions.map(c => `(${c})`).join(' OR ')
+  // Build deny WHERE part
+  const denyWhere = denyConditions.length > 0
+    ? denyConditions.length === 1
+      ? `NOT (${denyConditions[0]!})`
+      : `NOT (${denyConditions.map(c => `(${c})`).join(' OR ')})`
+    : null
 
-  return { where, params: ctx.params }
+  // Combine: (NOT deny) AND (allow)
+  if (denyWhere && allowWhere)
+    return { where: `(${denyWhere}) AND (${allowWhere})`, params: ctx.params }
+  if (denyWhere)
+    return { where: denyWhere, params: ctx.params }
+  if (allowWhere)
+    return { where: allowWhere, params: ctx.params }
+  return null
 }
 
 /**

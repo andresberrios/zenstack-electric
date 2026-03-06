@@ -126,16 +126,16 @@ the whole filter is `{ where: 'false', params: [] }`.
 **Test helpers:** Use the existing `allow()` helper at `test/index.test.ts:37-45` as a template
 to create a `deny()` helper that produces `{ name: '@@deny', args: [...] }`.
 
-- [ ] Add `deny()` test helper function in `test/index.test.ts` (mirror `allow()`)
-- [ ] In `compileModelFilter`, extract `@@deny` attributes alongside `@@allow`
-- [ ] Compile deny conditions and combine as: `(NOT (deny1 OR deny2 ...)) AND (allow1 OR allow2 ...)`
-- [ ] If any deny rule is unconditional (`true`), short-circuit to `{ where: 'false', params: [] }`
-- [ ] If deny has `false` condition, skip it (deny nothing = no effect)
-- [ ] Add unit test: `@@allow('all', true) + @@deny('all', status == 'DELETED')` → `NOT ("status" = $1)`
-- [ ] Add unit test: `@@deny('all', true)` → `{ where: 'false' }` regardless of allow rules
-- [ ] Add unit test: `@@deny('all', false) + @@allow('all', true)` → `null` (deny false = no-op)
-- [ ] Add unit test: multiple deny rules combined with OR inside the NOT
-- [ ] Add unit test: deny + multiple allow rules compose correctly
+- [x] Add `deny()` test helper function in `test/index.test.ts` (mirror `allow()`)
+- [x] In `compileModelFilter`, extract `@@deny` attributes alongside `@@allow`
+- [x] Compile deny conditions and combine as: `(NOT (deny1 OR deny2 ...)) AND (allow1 OR allow2 ...)`
+- [x] If any deny rule is unconditional (`true`), short-circuit to `{ where: 'false', params: [] }`
+- [x] If deny has `false` condition, skip it (deny nothing = no effect)
+- [x] Add unit test: `@@allow('all', true) + @@deny('all', status == 'DELETED')` → `NOT ("status" = $1)`
+- [x] Add unit test: `@@deny('all', true)` → `{ where: 'false' }` regardless of allow rules
+- [x] Add unit test: `@@deny('all', false) + @@allow('all', true)` → `null` (deny false = no-op)
+- [x] Add unit test: multiple deny rules combined with OR inside the NOT
+- [x] Add unit test: deny + multiple allow rules compose correctly
 
 **Files:** `src/compile.ts`, `test/index.test.ts`
 

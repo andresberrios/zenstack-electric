@@ -44,6 +44,16 @@ function allow(condition: unknown) {
   }
 }
 
+function deny(condition: unknown) {
+  return {
+    name: '@@deny',
+    args: [
+      { name: 'operation', value: { kind: 'literal', value: 'all' } },
+      { name: 'condition', value: condition },
+    ],
+  }
+}
+
 // Expression builders (mirror ZenStack's ExpressionUtils)
 const E = {
   literal: (value: string | number | boolean) => ({ kind: 'literal', value }),
@@ -408,6 +418,75 @@ describe('compileModelFilter', () => {
         ]),
       )
       expect(compileModelFilter('Post', schema)).toBeNull()
+    })
+  })
+
+  describe('@@deny rules', () => {
+    it('applies deny as NOT clause with unconditional allow', () => {
+      const schema = makeSchema(
+        model('Post', [field('id'), field('status')], [
+          allow(E.literal(true)),
+          deny(E.binary(E.field('status'), '==', E.literal('DELETED'))),
+        ]),
+      )
+      expect(compileModelFilter('Post', schema)).toEqual({
+        where: 'NOT ("status" = $1)',
+        params: [{ kind: 'static', value: 'DELETED' }],
+      })
+    })
+
+    it('short-circuits to false for unconditional deny', () => {
+      const schema = makeSchema(
+        model('Post', [field('id'), field('status')], [
+          allow(E.binary(E.field('status'), '==', E.literal('ACTIVE'))),
+          deny(E.literal(true)),
+        ]),
+      )
+      expect(compileModelFilter('Post', schema)).toEqual({
+        where: 'false',
+        params: [],
+      })
+    })
+
+    it('treats deny with false condition as no-op', () => {
+      const schema = makeSchema(
+        model('Post', [field('id')], [
+          deny(E.literal(false)),
+          allow(E.literal(true)),
+        ]),
+      )
+      expect(compileModelFilter('Post', schema)).toBeNull()
+    })
+
+    it('combines multiple deny rules with OR inside NOT', () => {
+      const schema = makeSchema(
+        model('Post', [field('id'), field('status'), field('archived')], [
+          deny(E.binary(E.field('status'), '==', E.literal('DELETED'))),
+          deny(E.binary(E.field('archived'), '==', E.literal(true))),
+          allow(E.literal(true)),
+        ]),
+      )
+      expect(compileModelFilter('Post', schema)).toEqual({
+        where: 'NOT (("status" = $1) OR ("archived" = true))',
+        params: [{ kind: 'static', value: 'DELETED' }],
+      })
+    })
+
+    it('composes deny with multiple allow rules correctly', () => {
+      const schema = makeSchema(
+        model('Post', [field('id'), field('deleted'), field('status'), field('ownerId')], [
+          deny(E.binary(E.field('deleted'), '==', E.literal(true))),
+          allow(E.binary(E.field('status'), '==', E.literal('PUBLIC'))),
+          allow(E.binary(E.field('ownerId'), '==', E.member(E.call('auth'), ['id']))),
+        ]),
+      )
+      expect(compileModelFilter('Post', schema)).toEqual({
+        where: '(NOT ("deleted" = true)) AND (("status" = $1) OR ("ownerId" = $2))',
+        params: [
+          { kind: 'static', value: 'PUBLIC' },
+          { kind: 'auth', path: ['id'] },
+        ],
+      })
     })
   })
 
