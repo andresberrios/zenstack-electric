@@ -185,14 +185,14 @@ Apply the analogous pattern for `'false'`:
 - `&&`: `'false'` on either side → return `'false'`
 - `||`: `'false'` on either side → return the other side
 
-- [ ] In `compileBinary` for `&&`: if `l === 'false' || r === 'false'` → return `'false'`
-- [ ] In `compileBinary` for `||`: if `l === 'false'` return `r`; if `r === 'false'` return `l`
-- [ ] Add unit test: `false AND condition` → `'false'`
-- [ ] Add unit test: `condition AND false` → `'false'`
-- [ ] Add unit test: `false OR condition` → just `condition`
-- [ ] Add unit test: `condition OR false` → just `condition`
-- [ ] Add unit test: `false OR false` → `'false'`
-- [ ] Add unit test: `false AND false` → `'false'`
+- [x] In `compileBinary` for `&&`: if `l === 'false' || r === 'false'` → return `'false'`
+- [x] In `compileBinary` for `||`: if `l === 'false'` return `r`; if `r === 'false'` return `l`
+- [x] Add unit test: `false AND condition` → `'false'`
+- [x] Add unit test: `condition AND false` → `'false'`
+- [x] Add unit test: `false OR condition` → just `condition`
+- [x] Add unit test: `condition OR false` → just `condition`
+- [x] Add unit test: `false OR false` → `'false'`
+- [x] Add unit test: `false AND false` → `'false'`
 
 **Files:** `src/compile.ts`, `test/index.test.ts`
 

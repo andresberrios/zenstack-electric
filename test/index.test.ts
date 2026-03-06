@@ -389,6 +389,94 @@ describe('compileModelFilter', () => {
       expect(compileModelFilter('User', schema)).toBeNull()
     })
 
+    it('simplifies false AND condition to false', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allow(E.binary(
+            E.literal(false),
+            '&&',
+            E.binary(E.field('status'), '==', E.literal('ACTIVE')),
+          )),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: 'false',
+        params: [],
+      })
+    })
+
+    it('simplifies condition AND false to false', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allow(E.binary(
+            E.binary(E.field('status'), '==', E.literal('ACTIVE')),
+            '&&',
+            E.literal(false),
+          )),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: 'false',
+        params: [],
+      })
+    })
+
+    it('simplifies false OR condition to just condition', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allow(E.binary(
+            E.literal(false),
+            '||',
+            E.binary(E.field('status'), '==', E.literal('ACTIVE')),
+          )),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"status" = $1',
+        params: [{ kind: 'static', value: 'ACTIVE' }],
+      })
+    })
+
+    it('simplifies condition OR false to just condition', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allow(E.binary(
+            E.binary(E.field('status'), '==', E.literal('ACTIVE')),
+            '||',
+            E.literal(false),
+          )),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"status" = $1',
+        params: [{ kind: 'static', value: 'ACTIVE' }],
+      })
+    })
+
+    it('simplifies false OR false to false', () => {
+      const schema = makeSchema(
+        model('User', [field('id')], [
+          allow(E.binary(E.literal(false), '||', E.literal(false))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: 'false',
+        params: [],
+      })
+    })
+
+    it('simplifies false AND false to false', () => {
+      const schema = makeSchema(
+        model('User', [field('id')], [
+          allow(E.binary(E.literal(false), '&&', E.literal(false))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: 'false',
+        params: [],
+      })
+    })
+
     it('compiles NOT', () => {
       const schema = makeSchema(
         model('User', [field('id'), field('deleted')], [

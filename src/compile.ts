@@ -213,8 +213,13 @@ function compileBinary(
 
   // Logical operators
   if (op === '&&') {
+    const paramsBefore = ctx.params.length
     const l = compileExpression(left, model, ctx)
     const r = compileExpression(right, model, ctx)
+    if (l === 'false' || r === 'false') {
+      ctx.params.length = paramsBefore
+      return 'false'
+    }
     if (l === null && r === null)
       return null
     if (l === null)
@@ -228,6 +233,10 @@ function compileBinary(
     const r = compileExpression(right, model, ctx)
     if (l === null || r === null)
       return null // true OR x = true
+    if (l === 'false')
+      return r
+    if (r === 'false')
+      return l
     return `(${l}) OR (${r})`
   }
 
