@@ -1216,4 +1216,106 @@ describe('resolveShapeFilter', () => {
       params: { 1: '' },
     })
   })
+
+  it('stringifies numeric auth value', () => {
+    const def = {
+      where: '"id" = $1',
+      params: [{ kind: 'auth' as const, path: ['id'] }],
+    }
+    expect(resolveShapeFilter(def, { id: 123 })).toEqual({
+      where: '"id" = $1',
+      params: { 1: '123' },
+    })
+  })
+
+  it('stringifies boolean auth value', () => {
+    const def = {
+      where: '"active" = $1',
+      params: [{ kind: 'auth' as const, path: ['active'] }],
+    }
+    expect(resolveShapeFilter(def, { active: true })).toEqual({
+      where: '"active" = $1',
+      params: { 1: 'true' },
+    })
+  })
+
+  it('returns empty string for undefined auth value', () => {
+    const def = {
+      where: '"id" = $1',
+      params: [{ kind: 'auth' as const, path: ['id'] }],
+    }
+    expect(resolveShapeFilter(def, { id: undefined })).toEqual({
+      where: '"id" = $1',
+      params: { 1: '' },
+    })
+  })
+
+  it('returns empty string for missing auth key', () => {
+    const def = {
+      where: '"id" = $1',
+      params: [{ kind: 'auth' as const, path: ['id'] }],
+    }
+    expect(resolveShapeFilter(def, {})).toEqual({
+      where: '"id" = $1',
+      params: { 1: '' },
+    })
+  })
+
+  it('returns empty string for empty auth with nested path', () => {
+    const def = {
+      where: '"orgId" = $1',
+      params: [{ kind: 'auth' as const, path: ['org', 'team', 'id'] }],
+    }
+    expect(resolveShapeFilter(def, {})).toEqual({
+      where: '"orgId" = $1',
+      params: { 1: '' },
+    })
+  })
+
+  it('passes through SQL-injection-like auth value as-is', () => {
+    const def = {
+      where: '"id" = $1',
+      params: [{ kind: 'auth' as const, path: ['id'] }],
+    }
+    expect(resolveShapeFilter(def, { id: '\'; DROP TABLE --' })).toEqual({
+      where: '"id" = $1',
+      params: { 1: '\'; DROP TABLE --' },
+    })
+  })
+
+  it('resolves two params both reading auth.id to same value', () => {
+    const def = {
+      where: '("ownerId" = $1) OR ("creatorId" = $2)',
+      params: [
+        { kind: 'auth' as const, path: ['id'] },
+        { kind: 'auth' as const, path: ['id'] },
+      ],
+    }
+    expect(resolveShapeFilter(def, { id: 'user-1' })).toEqual({
+      where: '("ownerId" = $1) OR ("creatorId" = $2)',
+      params: { 1: 'user-1', 2: 'user-1' },
+    })
+  })
+
+  it('resolves deeply nested auth path with 3+ levels', () => {
+    const def = {
+      where: '"teamId" = $1',
+      params: [{ kind: 'auth' as const, path: ['org', 'team', 'id'] }],
+    }
+    expect(resolveShapeFilter(def, { org: { team: { id: 'team-42' } } })).toEqual({
+      where: '"teamId" = $1',
+      params: { 1: 'team-42' },
+    })
+  })
+
+  it('returns empty string when auth path traverses through array value', () => {
+    const def = {
+      where: '"orgId" = $1',
+      params: [{ kind: 'auth' as const, path: ['org', 'id'] }],
+    }
+    expect(resolveShapeFilter(def, { org: [1, 2] })).toEqual({
+      where: '"orgId" = $1',
+      params: { 1: '' },
+    })
+  })
 })

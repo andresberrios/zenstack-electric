@@ -270,15 +270,15 @@ final value to a string. Existing tests are at `test/index.test.ts:567-639`.
 into SQL strings. So SQL-injection-like values should pass through safely. The unit test verifies
 this at the `resolveShapeFilter` level; the e2e test (Task 13) verifies it against real Electric.
 
-- [ ] Add unit test: auth value is a number (`{ id: 123 }`) → stringified to `"123"`
-- [ ] Add unit test: auth value is a boolean (`{ active: true }`) → `"true"`
-- [ ] Add unit test: auth value is `undefined` (`{ id: undefined }`) → `""`
-- [ ] Add unit test: auth key missing entirely (`{}` with path `['id']`) → `""`
-- [ ] Add unit test: auth is empty object `{}` with nested path → `""`
-- [ ] Add unit test: auth value is SQL-injection-like string (`"'; DROP TABLE --"`) → passed through as `"'; DROP TABLE --"`
-- [ ] Add unit test: two params both reading `auth.id` → both resolve to same value
-- [ ] Add unit test: deeply nested path (`auth.org.team.id`) with 3+ levels → resolves correctly
-- [ ] Add unit test: auth path traverses through array value (`{ org: [1,2] }`, path `['org', 'id']`) → `""` (array is not object-indexable)
+- [x] Add unit test: auth value is a number (`{ id: 123 }`) → stringified to `"123"`
+- [x] Add unit test: auth value is a boolean (`{ active: true }`) → `"true"`
+- [x] Add unit test: auth value is `undefined` (`{ id: undefined }`) → `""`
+- [x] Add unit test: auth key missing entirely (`{}` with path `['id']`) → `""`
+- [x] Add unit test: auth is empty object `{}` with nested path → `""`
+- [x] Add unit test: auth value is SQL-injection-like string (`"'; DROP TABLE --"`) → passed through as `"'; DROP TABLE --"`
+- [x] Add unit test: two params both reading `auth.id` → both resolve to same value
+- [x] Add unit test: deeply nested path (`auth.org.team.id`) with 3+ levels → resolves correctly
+- [x] Add unit test: auth path traverses through array value (`{ org: [1,2] }`, path `['org', 'id']`) → `""` (array is not object-indexable)
 
 **Files:** `test/index.test.ts`
 
