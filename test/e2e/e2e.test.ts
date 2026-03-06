@@ -97,6 +97,7 @@ describe('electric shape filters (e2e)', () => {
     await client.nullableRecord.deleteMany({})
     await client.numericRecord.deleteMany({})
     await pool.query('DELETE FROM "CreateOnlyRecord"')
+    await client.user.deleteMany({})
     await client.ownedRecord.deleteMany({})
     await client.activeRecord.deleteMany({})
     await client.publicPost.deleteMany({})
@@ -107,6 +108,10 @@ describe('electric shape filters (e2e)', () => {
         { title: 'Post 2' },
         { title: 'Post 3' },
       ],
+    })
+
+    await client.user.create({
+      data: { id: 'seed-user-1', email: 'seed@example.com' },
     })
 
     await client.activeRecord.createMany({
@@ -336,6 +341,24 @@ describe('electric shape filters (e2e)', () => {
     expect(filter).not.toBeNull()
 
     const rows = await queryElectricShape('TeamProject', filter)
+    expect(rows).toHaveLength(0)
+  })
+
+  // -------------------------------------------------------------------------
+  // Deny-all via Electric
+  // -------------------------------------------------------------------------
+
+  it('user: deny-all filter returns 0 rows from Electric despite seeded data', async () => {
+    const filter = getShapeFilter('User')
+    expect(filter).not.toBeNull()
+    expect(filter!.where).toBe('false')
+
+    const rows = await queryElectricShape('User', filter)
+    expect(rows).toHaveLength(0)
+  })
+
+  it('publicPost: raw false filter returns 0 rows despite data existing', async () => {
+    const rows = await queryElectricShape('PublicPost', { where: 'false', params: {} })
     expect(rows).toHaveLength(0)
   })
 
