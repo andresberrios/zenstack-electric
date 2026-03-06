@@ -168,6 +168,56 @@ describe('compileModelFilter', () => {
         params: [{ kind: 'static', value: '0' }],
       })
     })
+
+    it('compiles < operator', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('age', { type: 'Int' })], [
+          allow(E.binary(E.field('age'), '<', E.literal(18))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"age" < $1',
+        params: [{ kind: 'static', value: '18' }],
+      })
+    })
+
+    it('compiles <= operator', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('age', { type: 'Int' })], [
+          allow(E.binary(E.field('age'), '<=', E.literal(65))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"age" <= $1',
+        params: [{ kind: 'static', value: '65' }],
+      })
+    })
+
+    it('compiles >= operator', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('age', { type: 'Int' })], [
+          allow(E.binary(E.field('age'), '>=', E.literal(21))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '"age" >= $1',
+        params: [{ kind: 'static', value: '21' }],
+      })
+    })
+  })
+
+  describe('in operator', () => {
+    it('compiles in operator', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status')], [
+          allow(E.binary(E.field('status'), 'in', E.literal('list'))),
+        ]),
+      )
+      const result = compileModelFilter('User', schema)
+      expect(result).toBeTruthy()
+      expect(result!.where).toContain('IN')
+      expect(result!.where).toContain('"status"')
+    })
   })
 
   describe('field == auth()', () => {
@@ -499,6 +549,66 @@ describe('compileModelFilter', () => {
         params: [],
       })
     })
+
+    it('compiles deeply nested (A && B) || (C && D) with correct parenthesization and param numbering', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status'), field('role'), field('tier'), field('org')], [
+          allow(E.binary(
+            E.binary(
+              E.binary(E.field('status'), '==', E.literal('ACTIVE')),
+              '&&',
+              E.binary(E.field('role'), '==', E.literal('ADMIN')),
+            ),
+            '||',
+            E.binary(
+              E.binary(E.field('tier'), '==', E.literal('PREMIUM')),
+              '&&',
+              E.binary(E.field('org'), '==', E.literal('ACME')),
+            ),
+          )),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: '(("status" = $1) AND ("role" = $2)) OR (("tier" = $3) AND ("org" = $4))',
+        params: [
+          { kind: 'static', value: 'ACTIVE' },
+          { kind: 'static', value: 'ADMIN' },
+          { kind: 'static', value: 'PREMIUM' },
+          { kind: 'static', value: 'ACME' },
+        ],
+      })
+    })
+
+    it('compiles NOT (A || B)', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('status'), field('role')], [
+          allow(E.unary('!', E.binary(
+            E.binary(E.field('status'), '==', E.literal('DELETED')),
+            '||',
+            E.binary(E.field('role'), '==', E.literal('BANNED')),
+          ))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: 'NOT (("status" = $1) OR ("role" = $2))',
+        params: [
+          { kind: 'static', value: 'DELETED' },
+          { kind: 'static', value: 'BANNED' },
+        ],
+      })
+    })
+
+    it('compiles NOT (NOT x) as double negation', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('deleted')], [
+          allow(E.unary('!', E.unary('!', E.binary(E.field('deleted'), '==', E.literal(true))))),
+        ]),
+      )
+      expect(compileModelFilter('User', schema)).toEqual({
+        where: 'NOT (NOT ("deleted" = true))',
+        params: [],
+      })
+    })
   })
 
   describe('multiple allow rules', () => {
@@ -514,6 +624,24 @@ describe('compileModelFilter', () => {
         params: [
           { kind: 'static', value: 'PUBLIC' },
           { kind: 'auth', path: ['id'] },
+        ],
+      })
+    })
+
+    it('combines three allow rules with triple OR', () => {
+      const schema = makeSchema(
+        model('Post', [field('id'), field('status'), field('ownerId'), field('role')], [
+          allow(E.binary(E.field('status'), '==', E.literal('PUBLIC'))),
+          allow(E.binary(E.field('ownerId'), '==', E.member(E.call('auth'), ['id']))),
+          allow(E.binary(E.field('role'), '==', E.literal('ADMIN'))),
+        ]),
+      )
+      expect(compileModelFilter('Post', schema)).toEqual({
+        where: '("status" = $1) OR ("ownerId" = $2) OR ("role" = $3)',
+        params: [
+          { kind: 'static', value: 'PUBLIC' },
+          { kind: 'auth', path: ['id'] },
+          { kind: 'static', value: 'ADMIN' },
         ],
       })
     })
@@ -869,6 +997,15 @@ describe('compileModelFilter', () => {
         ]),
       )
       expect(() => compileModelFilter('Author', schema)).toThrow('composite foreign keys')
+    })
+
+    it('throws for unsupported operator', () => {
+      const schema = makeSchema(
+        model('User', [field('id'), field('name')], [
+          allow(E.binary(E.field('name'), '~', E.literal('pattern'))),
+        ]),
+      )
+      expect(() => compileModelFilter('User', schema)).toThrow('Unsupported operator')
     })
 
     it('throws for standalone relation member access', () => {

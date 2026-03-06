@@ -229,15 +229,15 @@ Test helpers `E.binary`, `E.unary`, `E.literal`, `E.field` at `test/index.test.t
 
 **No code changes needed** — this task only adds tests for existing code paths.
 
-- [ ] Add unit test: `field < literal` → `"age" < $1`
-- [ ] Add unit test: `field <= literal` → `"age" <= $1`
-- [ ] Add unit test: `field >= literal` → `"age" >= $1`
-- [ ] Add unit test: unsupported operator (e.g. `~`) throws `Unsupported operator`
-- [ ] Add unit test: `in` operator — `E.binary(E.field('status'), 'in', E.literal('list'))` — verify output shape
-- [ ] Add unit test: deeply nested `(A && B) || (C && D)` — verify correct parenthesization and param numbering
-- [ ] Add unit test: `NOT (A || B)` — NOT wrapping an OR
-- [ ] Add unit test: `NOT (NOT x)` — double negation produces `NOT (NOT (...))`
-- [ ] Add unit test: 3 allow rules → triple OR `(cond1) OR (cond2) OR (cond3)`
+- [x] Add unit test: `field < literal` → `"age" < $1`
+- [x] Add unit test: `field <= literal` → `"age" <= $1`
+- [x] Add unit test: `field >= literal` → `"age" >= $1`
+- [x] Add unit test: unsupported operator (e.g. `~`) throws `Unsupported operator`
+- [x] Add unit test: `in` operator — `E.binary(E.field('status'), 'in', E.literal('list'))` — verify output shape
+- [x] Add unit test: deeply nested `(A && B) || (C && D)` — verify correct parenthesization and param numbering
+- [x] Add unit test: `NOT (A || B)` — NOT wrapping an OR
+- [x] Add unit test: `NOT (NOT x)` — double negation produces `NOT (NOT (...))`
+- [x] Add unit test: 3 allow rules → triple OR `(cond1) OR (cond2) OR (cond3)`
 
 **Files:** `test/index.test.ts`
 
