@@ -397,11 +397,11 @@ the expected 3 rows seeded in `beforeAll`. This confirms no data was modified/dr
 
 **Electric parameterized query safety:** https://electric-sql.com/docs/guides/shapes#parameters
 
-- [ ] Test: `auth = { id: "'; DROP TABLE \"OwnedRecord\" --" }` → 0 rows, no error
-- [ ] Test: `auth = { id: "" }` → 0 rows
-- [ ] Test: `auth = { id: null }` → resolves to `""` → 0 rows
-- [ ] Test: `auth = {}` → missing key resolves to `""` → 0 rows
-- [ ] After adversarial tests, query `OwnedRecord` with valid auth (`user1`) → still returns 2 rows (data intact)
+- [x] Test: `auth = { id: "'; DROP TABLE \"OwnedRecord\" --" }` → 0 rows, no error
+- [x] Test: `auth = { id: "" }` → 0 rows
+- [x] Test: `auth = { id: null }` → resolves to `""` → 0 rows
+- [x] Test: `auth = {}` → missing key resolves to `""` → 0 rows
+- [x] After adversarial tests, query `OwnedRecord` with valid auth (`user1`) → still returns 2 rows (data intact)
 
 **Files:** `test/e2e/e2e.test.ts`
 

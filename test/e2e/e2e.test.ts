@@ -338,4 +338,48 @@ describe('electric shape filters (e2e)', () => {
     const rows = await queryElectricShape('TeamProject', filter)
     expect(rows).toHaveLength(0)
   })
+
+  // -------------------------------------------------------------------------
+  // Security: adversarial auth data
+  // -------------------------------------------------------------------------
+
+  it('ownedRecord: SQL injection auth value returns 0 rows', async () => {
+    const filter = getShapeFilter('OwnedRecord', { id: '\'; DROP TABLE "OwnedRecord" --' })
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('OwnedRecord', filter)
+    expect(rows).toHaveLength(0)
+  })
+
+  it('ownedRecord: empty string auth value returns 0 rows', async () => {
+    const filter = getShapeFilter('OwnedRecord', { id: '' })
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('OwnedRecord', filter)
+    expect(rows).toHaveLength(0)
+  })
+
+  it('ownedRecord: null auth value returns 0 rows', async () => {
+    const filter = getShapeFilter('OwnedRecord', { id: null })
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('OwnedRecord', filter)
+    expect(rows).toHaveLength(0)
+  })
+
+  it('ownedRecord: empty auth object returns 0 rows', async () => {
+    const filter = getShapeFilter('OwnedRecord', {})
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('OwnedRecord', filter)
+    expect(rows).toHaveLength(0)
+  })
+
+  it('ownedRecord: data intact after adversarial tests', async () => {
+    const filter = getShapeFilter('OwnedRecord', { id: 'user1' })
+
+    const rows = await queryElectricShape('OwnedRecord', filter)
+    expect(rows).toHaveLength(2)
+    expect(rows.every(r => r.ownerId === 'user1')).toBe(true)
+  })
 })
