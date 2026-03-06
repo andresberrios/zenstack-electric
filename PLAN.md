@@ -327,16 +327,16 @@ valid ZModel syntax. Test locally with `npx zen generate --schema test/e2e/zenst
 **Note on relation models:** `Team` needs no allow/deny rules itself (it's referenced by
 `TeamProject`). Use `@relation(fields: [teamId], references: [id])` on the FK side.
 
-- [ ] Add `DenyDeletedPost` model: `@@allow('read', true)` + `@@deny('read', deleted == true)`
-- [ ] Add `AndFilterRecord` model: `@@allow('read', published == true && status == 'ACTIVE')`
-- [ ] Add `MultiPolicyPost` model: two `@@allow('read', ...)` rules (status == 'PUBLIC', ownerId == auth().id)
-- [ ] Add `NotDeletedRecord` model: `@@allow('read', !(deleted == true))`
-- [ ] Add `NullableRecord` model: `@@allow('read', deletedAt == null)` (requires Task 1 IS NULL fix)
-- [ ] Add `NumericRecord` model: `@@allow('read', price > 0)`
-- [ ] Add `CreateOnlyRecord` model: `@@allow('create', true)` (no read rule → deny all reads; requires Task 3)
-- [ ] Add `Team` model (id, name) with `@@allow('read', true)` + `TeamProject` model with relation and `@@allow('read', team.name == auth().teamName)`
-- [ ] Verify `npx zen generate` succeeds with the expanded schema
-- [ ] Verify `npx zen db push` applies cleanly (may need to drop/recreate DB for new tables)
+- [x] Add `DenyDeletedPost` model: `@@allow('read', true)` + `@@deny('read', deleted == true)`
+- [x] Add `AndFilterRecord` model: `@@allow('read', published == true && status == 'ACTIVE')`
+- [x] Add `MultiPolicyPost` model: two `@@allow('read', ...)` rules (status == 'PUBLIC', ownerId == auth().id)
+- [x] Add `NotDeletedRecord` model: `@@allow('read', !(deleted == true))`
+- [x] Add `NullableRecord` model: `@@allow('read', deletedAt == null)` (requires Task 1 IS NULL fix)
+- [x] Add `NumericRecord` model: `@@allow('read', price > 0)`
+- [x] Add `CreateOnlyRecord` model: `@@allow('create', true)` (no read rule → deny all reads; requires Task 3)
+- [x] Add `Team` model (id, name) with `@@allow('read', true)` + `TeamProject` model with relation and `@@allow('read', team.name == auth().teamName)`
+- [x] Verify `npx zen generate` succeeds with the expanded schema
+- [x] Verify `npx zen db push` applies cleanly (may need to drop/recreate DB for new tables)
 
 **Files:** `test/e2e/zenstack/schema.zmodel`
 

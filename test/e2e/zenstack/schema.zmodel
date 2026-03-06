@@ -13,8 +13,9 @@ plugin electric {
 }
 
 model User {
-  id    String @id
-  email String
+  id       String  @id
+  email    String
+  teamName String?
 
   @@auth
 }
@@ -40,4 +41,80 @@ model OwnedRecord {
   ownerId String
 
   @@allow('read', ownerId == auth().id)
+}
+
+model DenyDeletedPost {
+  id      Int     @id @default(autoincrement())
+  title   String
+  deleted Boolean
+
+  @@allow('read', true)
+  @@deny('read', deleted == true)
+}
+
+model AndFilterRecord {
+  id        Int     @id @default(autoincrement())
+  name      String
+  published Boolean
+  status    String
+
+  @@allow('read', published == true && status == 'ACTIVE')
+}
+
+model MultiPolicyPost {
+  id      Int    @id @default(autoincrement())
+  title   String
+  status  String
+  ownerId String
+
+  @@allow('read', status == 'PUBLIC')
+  @@allow('read', ownerId == auth().id)
+}
+
+model NotDeletedRecord {
+  id      Int     @id @default(autoincrement())
+  name    String
+  deleted Boolean
+
+  @@allow('read', !(deleted == true))
+}
+
+model NullableRecord {
+  id        Int       @id @default(autoincrement())
+  name      String
+  deletedAt DateTime?
+
+  @@allow('read', deletedAt == null)
+}
+
+model NumericRecord {
+  id    Int    @id @default(autoincrement())
+  name  String
+  price Float
+
+  @@allow('read', price > 0)
+}
+
+model CreateOnlyRecord {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  @@allow('create', true)
+}
+
+model Team {
+  id       Int           @id @default(autoincrement())
+  name     String
+  projects TeamProject[]
+
+  @@allow('read', true)
+}
+
+model TeamProject {
+  id     Int    @id @default(autoincrement())
+  name   String
+  teamId Int
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  @@allow('read', team.name == auth().teamName)
 }
