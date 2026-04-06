@@ -19,8 +19,8 @@ export function generateFiltersSource(
   if (authModel) {
     lines.push(`export interface AuthModelType {`)
     for (const field of authModel.fields) {
-      const opt = field.optional ? '?' : ''
-      lines.push(`  ${field.name}${opt}: ${field.type}`)
+      const typeStr = field.optional ? `${field.type} | null` : field.type
+      lines.push(`  ${field.name}: ${typeStr}`)
     }
     lines.push(`}`)
     lines.push(``)
