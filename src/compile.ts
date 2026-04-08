@@ -271,13 +271,17 @@ function compileCompareSide(
     const receiver = expr.receiver as Expression
     if (receiver.kind === 'field') {
       const fieldName = receiver.field as string
+      const members = expr.members as string[]
       const modelDef = ctx.schema.models[model] as ModelDef
       const fieldDef = modelDef.fields[fieldName]
       if (fieldDef?.relation) {
-        const members = expr.members as string[]
         const chain = resolveRelationChain(fieldName, members, model, ctx.schema)
         return { sql: '', isRelationTraversal: true, relationChain: chain }
       }
+      throw new Error(
+        `"${fieldName}.${members.join('.')}" on ${model}: sub-field access is only supported for relation fields. `
+        + `Typed JSON field access in policies is not supported by ZenStack.`,
+      )
     }
     if (receiver.kind === 'call') {
       const sql = compileMember(expr, model, ctx)!
@@ -457,7 +461,8 @@ function compileMember(
 
   if (receiver.kind === 'field') {
     throw new Error(
-      `Relation member access "${(receiver.field as string)}.${members.join('.')}" on ${model} cannot be used standalone — only in comparisons`,
+      `"${(receiver.field as string)}.${members.join('.')}" on ${model}: sub-field access is only supported for relation fields in comparisons. `
+      + `Typed JSON field access in policies is not supported by ZenStack.`,
     )
   }
 

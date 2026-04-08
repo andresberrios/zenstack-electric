@@ -1,4 +1,4 @@
-import type { AuthModelInfo } from './ast-transform'
+import type { AuthFieldInfo, AuthModelInfo } from './ast-transform'
 import type { ParamDef, ShapeFilterDef } from './types'
 
 /**
@@ -17,12 +17,19 @@ export function generateFiltersSource(
   ]
 
   if (authModel) {
-    lines.push(`export interface AuthModelType {`)
-    for (const field of authModel.fields) {
-      const typeStr = field.optional ? `${field.type} | null` : field.type
-      lines.push(`  ${field.name}: ${typeStr}`)
+    // Generate nested type interfaces first (deduplicated)
+    const nestedTypes = collectNestedTypes(authModel)
+    const seen = new Set<string>()
+    for (const nested of nestedTypes) {
+      if (seen.has(nested.name))
+        continue
+      seen.add(nested.name)
+      lines.push(...generateInterfaceLines(nested.name, nested.fields))
+      lines.push(``)
     }
-    lines.push(`}`)
+
+    // Generate main auth interface
+    lines.push(...generateInterfaceLines('AuthModelType', authModel.fields))
     lines.push(``)
   }
 
@@ -63,4 +70,27 @@ function serializeParamDef(param: ParamDef): string {
     return `{ kind: 'static', value: ${JSON.stringify(param.value)} }`
   }
   return `{ kind: 'auth', path: ${JSON.stringify(param.path)} }`
+}
+
+function generateInterfaceLines(name: string, fields: AuthFieldInfo[]): string[] {
+  const lines: string[] = [`export interface ${name} {`]
+  for (const field of fields) {
+    const typeName = field.nestedType ? field.nestedType.name : field.type
+    const typeStr = field.optional ? `${typeName} | null` : typeName
+    lines.push(`  ${field.name}: ${typeStr}`)
+  }
+  lines.push(`}`)
+  return lines
+}
+
+function collectNestedTypes(authModel: AuthModelInfo): AuthModelInfo[] {
+  const result: AuthModelInfo[] = []
+  for (const field of authModel.fields) {
+    if (field.nestedType) {
+      // Collect deeper nested types first (depth-first) so they're defined before use
+      result.push(...collectNestedTypes(field.nestedType))
+      result.push(field.nestedType)
+    }
+  }
+  return result
 }

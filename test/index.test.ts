@@ -1138,7 +1138,7 @@ describe('compileModelFilter', () => {
           allow(E.member(E.field('related'), ['name'])),
         ]),
       )
-      expect(() => compileModelFilter('User', schema)).toThrow('cannot be used standalone')
+      expect(() => compileModelFilter('User', schema)).toThrow('sub-field access is only supported for relation fields in comparisons')
     })
   })
 })

@@ -137,7 +137,7 @@ describe('generateFiltersSource', () => {
     expect(source).toContain('export interface AuthModelType {')
     expect(source).toContain('  id: string')
     expect(source).toContain('  email: string')
-    expect(source).toContain('  name?: string')
+    expect(source).toContain('  name: string | null')
     expect(source).toContain('  role: string')
     expect(source).toContain('auth?: Partial<AuthModelType>')
   })
@@ -154,5 +154,118 @@ describe('generateFiltersSource', () => {
 
     expect(source).not.toContain('AuthModelType')
     expect(source).toContain('auth?: Record<string, any>')
+  })
+
+  it('generates nested type interfaces for custom type fields', () => {
+    const source = generateFiltersSource({}, {
+      name: 'Auth',
+      fields: [
+        { name: 'id', type: 'string', optional: false },
+        {
+          name: 'org',
+          type: 'Org',
+          optional: false,
+          nestedType: {
+            name: 'Org',
+            fields: [
+              { name: 'id', type: 'string', optional: false },
+              { name: 'name', type: 'string', optional: false },
+            ],
+          },
+        },
+      ],
+    })
+
+    // Nested interface should be generated before the main one
+    expect(source).toContain('export interface Org {')
+    expect(source).toContain('export interface AuthModelType {')
+    expect(source).toContain('  org: Org')
+    // Nested interface should appear before AuthModelType
+    expect(source.indexOf('interface Org')).toBeLessThan(source.indexOf('interface AuthModelType'))
+  })
+
+  it('generates deeply nested type interfaces in correct order', () => {
+    const source = generateFiltersSource({}, {
+      name: 'Auth',
+      fields: [
+        { name: 'id', type: 'string', optional: false },
+        {
+          name: 'org',
+          type: 'Org',
+          optional: false,
+          nestedType: {
+            name: 'Org',
+            fields: [
+              { name: 'id', type: 'string', optional: false },
+              {
+                name: 'address',
+                type: 'Address',
+                optional: false,
+                nestedType: {
+                  name: 'Address',
+                  fields: [
+                    { name: 'city', type: 'string', optional: false },
+                    { name: 'zip', type: 'number', optional: false },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    })
+
+    expect(source).toContain('export interface Address {')
+    expect(source).toContain('export interface Org {')
+    expect(source).toContain('export interface AuthModelType {')
+    expect(source).toContain('  address: Address')
+    expect(source).toContain('  org: Org')
+    // Depth-first: Address before Org before AuthModelType
+    expect(source.indexOf('interface Address')).toBeLessThan(source.indexOf('interface Org'))
+    expect(source.indexOf('interface Org')).toBeLessThan(source.indexOf('interface AuthModelType'))
+  })
+
+  it('handles optional nested type fields with | null', () => {
+    const source = generateFiltersSource({}, {
+      name: 'Auth',
+      fields: [
+        { name: 'id', type: 'string', optional: false },
+        {
+          name: 'org',
+          type: 'Org',
+          optional: true,
+          nestedType: {
+            name: 'Org',
+            fields: [
+              { name: 'id', type: 'string', optional: false },
+            ],
+          },
+        },
+      ],
+    })
+
+    expect(source).toContain('  org: Org | null')
+  })
+
+  it('deduplicates nested types used in multiple fields', () => {
+    const sharedType = {
+      name: 'Tag',
+      fields: [
+        { name: 'key', type: 'string', optional: false },
+        { name: 'value', type: 'string', optional: false },
+      ],
+    }
+
+    const source = generateFiltersSource({}, {
+      name: 'Auth',
+      fields: [
+        { name: 'primaryTag', type: 'Tag', optional: false, nestedType: sharedType },
+        { name: 'secondaryTag', type: 'Tag', optional: true, nestedType: sharedType },
+      ],
+    })
+
+    // Should only generate one Tag interface
+    const tagCount = (source.match(/export interface Tag \{/g) || []).length
+    expect(tagCount).toBe(1)
   })
 })

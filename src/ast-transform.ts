@@ -12,6 +12,7 @@ import type {
   NumberLiteral,
   ReferenceExpr,
   StringLiteral,
+  TypeDef,
   UnaryExpr,
 } from '@zenstackhq/sdk/ast'
 
@@ -19,6 +20,7 @@ export interface AuthFieldInfo {
   name: string
   type: string
   optional: boolean
+  nestedType?: AuthModelInfo
 }
 
 export interface AuthModelInfo {
@@ -39,37 +41,85 @@ const zmodelToTsType: Record<string, string> = {
 }
 
 /**
- * Find the model annotated with `@@auth()` and extract its scalar fields
- * with their TypeScript types, for use in generated type definitions.
+ * Find the auth model and extract its fields with TypeScript types,
+ * for use in generated type definitions.
+ *
+ * Resolution order (matches ZenStack semantics):
+ * 1. Model or type annotated with `@@auth`
+ * 2. Model or type named "User"
+ * 3. Returns null (no auth model found)
  */
 export function extractAuthModel(model: Model): AuthModelInfo | null {
+  let authDecl: DataModel | TypeDef | null = null
+
+  // 1. Look for @@auth attribute
   for (const decl of model.declarations) {
-    if (decl.$type !== 'DataModel')
+    if (decl.$type !== 'DataModel' && decl.$type !== 'TypeDef')
       continue
-    const dm = decl as DataModel
-    const hasAuth = dm.attributes.some(a => a.decl.ref?.name === '@@auth')
-    if (!hasAuth)
-      continue
+    const dm = decl as DataModel | TypeDef
+    if (dm.attributes.some(a => a.decl.ref?.name === '@@auth')) {
+      authDecl = dm
+      break
+    }
+  }
 
-    const fields: AuthFieldInfo[] = []
-    for (const field of dm.fields) {
-      // Skip relation fields (they reference other DataModels)
-      if (field.type.reference?.ref?.$type === 'DataModel')
+  // 2. Fallback: look for model/type named "User"
+  if (!authDecl) {
+    for (const decl of model.declarations) {
+      if (decl.$type !== 'DataModel' && decl.$type !== 'TypeDef')
         continue
+      const dm = decl as DataModel | TypeDef
+      if (dm.name === 'User') {
+        authDecl = dm
+        break
+      }
+    }
+  }
 
-      const zmodelType = field.type.reference?.ref?.name ?? field.type.type ?? 'String'
-      const tsType = zmodelToTsType[zmodelType] ?? 'string'
+  if (!authDecl)
+    return null
 
+  return extractDeclFields(authDecl, new Set())
+}
+
+function extractDeclFields(
+  decl: DataModel | TypeDef,
+  visited: Set<string>,
+): AuthModelInfo {
+  visited.add(decl.name)
+
+  const fields: AuthFieldInfo[] = []
+  for (const field of decl.fields) {
+    // Skip relation fields (they reference other DataModels)
+    if (field.type.reference?.ref?.$type === 'DataModel')
+      continue
+
+    // Nested custom type (TypeDef reference)
+    if (field.type.reference?.ref?.$type === 'TypeDef') {
+      const nestedDecl = field.type.reference.ref as TypeDef
+      if (visited.has(nestedDecl.name))
+        continue // guard against circular references
+      const nestedType = extractDeclFields(nestedDecl, new Set(visited))
       fields.push({
         name: field.name,
-        type: tsType,
+        type: nestedDecl.name,
         optional: field.type.optional || false,
+        nestedType,
       })
+      continue
     }
 
-    return { name: dm.name, fields }
+    const zmodelType = field.type.reference?.ref?.name ?? field.type.type ?? 'String'
+    const tsType = zmodelToTsType[zmodelType] ?? 'string'
+
+    fields.push({
+      name: field.name,
+      type: tsType,
+      optional: field.type.optional || false,
+    })
   }
-  return null
+
+  return { name: decl.name, fields }
 }
 
 /**

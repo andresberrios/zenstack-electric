@@ -66,6 +66,47 @@ const stream = new ShapeStream({
 })
 ```
 
+### Auth model type inference
+
+The generated `getShapeFilter` function includes a typed `auth` parameter based on your ZenStack schema. The auth model is resolved following ZenStack's semantics:
+
+1. A model or `type` annotated with `@@auth` is used
+2. Otherwise, a model or `type` named `User` is used
+3. If neither exists, the `auth` parameter falls back to `Record<string, any>`
+
+Custom types with nested types are fully supported:
+
+```prisma
+type Org {
+  id   String
+  name String
+}
+
+type Auth {
+  id   String
+  role String
+  org  Org
+  @@auth
+}
+```
+
+This generates typed interfaces in the output file:
+
+```ts
+export interface Org {
+  id: string
+  name: string
+}
+
+export interface AuthModelType {
+  id: string
+  role: string
+  org: Org
+}
+
+export function getShapeFilter(model: string, auth?: Partial<AuthModelType>): ShapeFilter | null
+```
+
 ### Return values
 
 | Scenario | `getShapeFilter` returns |
