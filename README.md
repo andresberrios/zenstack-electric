@@ -153,6 +153,7 @@ WHERE NOT ("deleted" = true) AND (("published" = true) AND ("status" = $1))
 | `cond1 \|\| cond2` | `(...) OR (...)` |
 | `relation.field == value` | `"fk" IN (SELECT "pk" FROM "Relation" WHERE ...)` |
 | `collection?[condition]` | `EXISTS (SELECT 1 FROM ... WHERE ...)` |
+| `relation.collection?[condition]` | Nested `"fk" IN (SELECT "pk" FROM ... WHERE ...)` down the to-one chain |
 | Multiple `@@allow` rules | Combined with `OR` |
 | Multiple `@@deny` rules | Combined with `OR`, then wrapped in `NOT (...)` |
 | `@@allow` + `@@deny` | `NOT (denies) AND (allows)` |
@@ -190,6 +191,7 @@ import {
 
 - **PostgreSQL only** — Electric SQL only supports PostgreSQL
 - **Composite foreign keys** are not supported (throws a descriptive error)
+- **Traversed collection predicates** (`a.b.collection?[...]`) support only the `?` (some) operator, and every hop before the collection must be a to-one relation; a NULL FK along the chain excludes the row, matching ZenStack's null-traversal semantics
 - **Read policies only** — Electric shapes are read-only, so only `read`/`all` operations are compiled
 - **`auth()` values are stringified** — all param values are converted to strings via `String(value ?? '')`
 

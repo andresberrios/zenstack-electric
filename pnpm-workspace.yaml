@@ -1,0 +1,14 @@
+catalogMode: prefer
+shellEmulator: true
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - chokidar@4.0.3
+
+overrides:
+  chokidar: 4.0.3
+
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
+  simple-git-hooks: true

@@ -396,6 +396,59 @@ function compileCollectionPredicate(
   model: string,
   ctx: CompileContext,
 ): string {
+  // Traversed collection predicate, e.g. `contract.organization.members?[...]`:
+  // walk the to-one FK hops down to the model owning the list relation,
+  // compile the direct collection predicate there, then wrap the result in
+  // nested `"fk" IN (SELECT "pk" FROM "Model" WHERE ...)` layers back up the
+  // chain. A NULL FK anywhere along the chain makes the row fail the filter,
+  // which matches ZenStack's null-traversal semantics for `?`.
+  if (left.kind === 'member' && (left.receiver as Expression).kind === 'field') {
+    if (op !== '?') {
+      throw new Error(
+        `Traversed collection predicate on ${model} only supports the "?" operator`,
+      )
+    }
+
+    const receiver = left.receiver as Expression
+    const path = [receiver.field as string, ...(left.members as string[])]
+    const listRelation = path.pop()!
+
+    let currentModel = model
+    const hops: { fk: string, pk: string, relatedModel: string }[] = []
+    for (const rel of path) {
+      const relDef = (ctx.schema.models[currentModel] as ModelDef).fields[rel]
+      if (!relDef?.relation?.fields?.length || !relDef.relation.references?.length) {
+        throw new Error(
+          `Relation "${rel}" on ${currentModel} has no fields/references — traversed collection predicates require to-one relations along the path`,
+        )
+      }
+      if (relDef.relation.fields.length > 1 || relDef.relation.references.length > 1) {
+        throw new Error(
+          `Relation "${rel}" on ${currentModel} has composite foreign keys — this is not supported by Electric shape filters`,
+        )
+      }
+      hops.push({
+        fk: relDef.relation.fields[0]!,
+        pk: relDef.relation.references[0]!,
+        relatedModel: relDef.type,
+      })
+      currentModel = relDef.type
+    }
+
+    let sql = compileCollectionPredicate(
+      { kind: 'field', field: listRelation },
+      right,
+      op,
+      currentModel,
+      ctx,
+    )
+    for (let i = hops.length - 1; i >= 0; i--) {
+      const hop = hops[i]!
+      sql = `"${hop.fk}" IN (SELECT "${hop.pk}" FROM "${hop.relatedModel}" WHERE ${sql})`
+    }
+    return sql
+  }
+
   if (left.kind !== 'field') {
     throw new Error(
       `Collection predicate on ${model} must use a direct relation field`,

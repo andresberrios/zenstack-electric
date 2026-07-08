@@ -965,6 +965,99 @@ describe('compileModelFilter', () => {
     })
   })
 
+  describe('traversed collection predicates', () => {
+    // Org tenancy shape: child models reach a membership check through
+    // to-one hops, e.g. `organization.members?[userId == auth().id]`.
+    function orgSchema(...extraModels: ReturnType<typeof model>[]) {
+      return makeSchema(
+        model('Organization', [
+          field('id'),
+          field('members', { type: 'Membership', array: true, relation: { opposite: 'organization' } }),
+        ]),
+        model('Membership', [
+          field('id'),
+          field('userId'),
+          field('organizationId'),
+          field('organization', { type: 'Organization', relation: { fields: ['organizationId'], references: ['id'], opposite: 'members' } }),
+        ]),
+        ...extraModels,
+      )
+    }
+
+    const memberCheck = (path: string[]) => E.binary(
+      E.member(E.field(path[0]!), [...path.slice(1), 'members']),
+      '?',
+      E.binary(E.field('userId'), '==', E.member(E.call('auth'), ['id'])),
+    )
+
+    it('compiles single-hop traversed predicate (organization.members?[...])', () => {
+      const schema = orgSchema(
+        model('Worker', [
+          field('id'),
+          field('organizationId'),
+          field('organization', { type: 'Organization', relation: { fields: ['organizationId'], references: ['id'] } }),
+        ], [
+          allow(memberCheck(['organization'])),
+        ]),
+      )
+      expect(compileModelFilter('Worker', schema)).toEqual({
+        where: '"organizationId" IN (SELECT "id" FROM "Organization" WHERE "id" IN (SELECT "organizationId" FROM "Membership" WHERE "userId" = $1))',
+        params: [{ kind: 'auth', path: ['id'] }],
+      })
+    })
+
+    it('compiles multi-hop traversed predicate (contract.organization.members?[...])', () => {
+      const schema = orgSchema(
+        model('Contract', [
+          field('id'),
+          field('organizationId'),
+          field('organization', { type: 'Organization', relation: { fields: ['organizationId'], references: ['id'] } }),
+        ]),
+        model('ContractSite', [
+          field('id'),
+          field('contractId'),
+          field('contract', { type: 'Contract', relation: { fields: ['contractId'], references: ['id'] } }),
+        ], [
+          allow(memberCheck(['contract', 'organization'])),
+        ]),
+      )
+      expect(compileModelFilter('ContractSite', schema)).toEqual({
+        where: '"contractId" IN (SELECT "id" FROM "Contract" WHERE "organizationId" IN (SELECT "id" FROM "Organization" WHERE "id" IN (SELECT "organizationId" FROM "Membership" WHERE "userId" = $1)))',
+        params: [{ kind: 'auth', path: ['id'] }],
+      })
+    })
+
+    it('throws for traversed predicate with non-? operator', () => {
+      const schema = orgSchema(
+        model('Worker', [
+          field('id'),
+          field('organizationId'),
+          field('organization', { type: 'Organization', relation: { fields: ['organizationId'], references: ['id'] } }),
+        ], [
+          allow(E.binary(
+            E.member(E.field('organization'), ['members']),
+            '^',
+            E.binary(E.field('userId'), '==', E.member(E.call('auth'), ['id'])),
+          )),
+        ]),
+      )
+      expect(() => compileModelFilter('Worker', schema)).toThrow('only supports the "?" operator')
+    })
+
+    it('throws for traversed predicate through a list relation hop', () => {
+      const schema = orgSchema(
+        model('Worker', [
+          field('id'),
+          // `organizations` is a list relation (no fields/references on this side)
+          field('organizations', { type: 'Organization', array: true, relation: { opposite: 'members' } }),
+        ], [
+          allow(memberCheck(['organizations'])),
+        ]),
+      )
+      expect(() => compileModelFilter('Worker', schema)).toThrow('to-one relations along the path')
+    })
+  })
+
   describe('nULL handling', () => {
     it('compiles field == null to IS NULL', () => {
       const schema = makeSchema(

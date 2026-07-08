@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     ports:
-      - '5432:5432'
+      - '${E2E_PG_PORT:-5432}:5432'
     command:
       - -c
       - listen_addresses=*
@@ -29,7 +29,7 @@ services:
       ELECTRIC_INSECURE: true
       ELECTRIC_FEATURE_FLAGS: allow_subqueries,tagged_subqueries
     ports:
-      - '3000:3000'
+      - '${E2E_ELECTRIC_PORT:-3000}:3000'
     depends_on:
       postgres:
         condition: service_healthy

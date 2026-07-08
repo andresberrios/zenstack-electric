@@ -1,6 +1,6 @@
 datasource db {
   provider = "postgresql"
-  url = "postgresql://postgres:password@localhost:5432/zenstack-electric"
+  url = env("E2E_DATABASE_URL")
 }
 
 plugin policy {
@@ -117,4 +117,39 @@ model TeamProject {
   team   Team   @relation(fields: [teamId], references: [id])
 
   @@allow('read', team.name == auth().teamName)
+}
+
+model Org {
+  id      Int         @id @default(autoincrement())
+  name    String
+  members OrgMember[]
+  docs    OrgDoc[]
+}
+
+model OrgMember {
+  id     Int    @id @default(autoincrement())
+  userId String
+  orgId  Int
+  org    Org    @relation(fields: [orgId], references: [id])
+}
+
+model OrgDoc {
+  id    Int          @id @default(autoincrement())
+  title String
+  orgId Int
+  org   Org          @relation(fields: [orgId], references: [id])
+  items OrgDocItem[]
+
+  // Traversed collection predicate: one to-one hop, then a membership check
+  @@allow('read', org.members?[userId == auth().id])
+}
+
+model OrgDocItem {
+  id    Int    @id @default(autoincrement())
+  label String
+  docId Int
+  doc   OrgDoc @relation(fields: [docId], references: [id])
+
+  // Two to-one hops before the membership check
+  @@allow('read', doc.org.members?[userId == auth().id])
 }

@@ -8,8 +8,9 @@ import { PostgresDialect } from '@zenstackhq/orm/dialects/postgres'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-const DATABASE_URL = 'postgresql://postgres:password@localhost:5432/zenstack-electric'
-const ELECTRIC_URL = 'http://localhost:3000'
+const DATABASE_URL = process.env.E2E_DATABASE_URL
+  ?? 'postgresql://postgres:password@localhost:5432/zenstack-electric'
+const ELECTRIC_URL = process.env.E2E_ELECTRIC_URL ?? 'http://localhost:3000'
 const PROJECT_ROOT = resolve(import.meta.dirname, '../..')
 const SCHEMA_PATH = resolve(import.meta.dirname, 'zenstack/schema.zmodel')
 const GENERATED_PATH = resolve(import.meta.dirname, 'zenstack/electric-filters.ts')
@@ -58,6 +59,10 @@ describe('electric shape filters (e2e)', () => {
   let getShapeFilter: (model: string, auth?: Record<string, unknown>) => ShapeFilter | null
 
   beforeAll(async () => {
+    // The fixture schema's datasource reads env("E2E_DATABASE_URL"); make sure
+    // it resolves for the zen CLI calls below even when not set externally.
+    process.env.E2E_DATABASE_URL ??= DATABASE_URL
+
     // Step 1: Run `zen generate` to produce electric-filters.ts + schema.ts
     execSync(`npx zen generate --schema ${SCHEMA_PATH}`, {
       cwd: PROJECT_ROOT,
@@ -88,6 +93,10 @@ describe('electric shape filters (e2e)', () => {
     })
 
     // Clean existing data before seeding
+    await client.orgDocItem.deleteMany({})
+    await client.orgDoc.deleteMany({})
+    await client.orgMember.deleteMany({})
+    await client.org.deleteMany({})
     await client.teamProject.deleteMany({})
     await client.team.deleteMany({})
     await client.denyDeletedPost.deleteMany({})
@@ -187,6 +196,33 @@ describe('electric shape filters (e2e)', () => {
         { name: 'Alpha Project 1', teamId: teamAlpha.id },
         { name: 'Alpha Project 2', teamId: teamAlpha.id },
         { name: 'Beta Project 1', teamId: teamBeta.id },
+      ],
+    })
+
+    // Traversed collection predicates: two orgs, membership only in Acme
+    const [orgAcme, orgOther] = await Promise.all([
+      client.org.create({ data: { name: 'Acme' } }),
+      client.org.create({ data: { name: 'Other' } }),
+    ])
+
+    await client.orgMember.createMany({
+      data: [
+        { userId: 'member-1', orgId: orgAcme.id },
+        { userId: 'member-2', orgId: orgOther.id },
+      ],
+    })
+
+    const [acmeDoc1, , otherDoc] = await Promise.all([
+      client.orgDoc.create({ data: { title: 'Acme Doc 1', orgId: orgAcme.id } }),
+      client.orgDoc.create({ data: { title: 'Acme Doc 2', orgId: orgAcme.id } }),
+      client.orgDoc.create({ data: { title: 'Other Doc', orgId: orgOther.id } }),
+    ])
+
+    await client.orgDocItem.createMany({
+      data: [
+        { label: 'Acme Item 1', docId: acmeDoc1.id },
+        { label: 'Acme Item 2', docId: acmeDoc1.id },
+        { label: 'Other Item', docId: otherDoc.id },
       ],
     })
   }, 60_000)
@@ -342,6 +378,43 @@ describe('electric shape filters (e2e)', () => {
 
     const rows = await queryElectricShape('TeamProject', filter)
     expect(rows).toHaveLength(0)
+  })
+
+  // -------------------------------------------------------------------------
+  // Traversed collection predicates (org.members?[...] through to-one hops)
+  // -------------------------------------------------------------------------
+
+  it('orgDoc: member sees only their org\'s docs (single-hop traversal)', async () => {
+    const filter = getShapeFilter('OrgDoc', { id: 'member-1' })
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('OrgDoc', filter)
+    expect(rows).toHaveLength(2)
+    expect(rows.every(r => r.title!.startsWith('Acme'))).toBe(true)
+  })
+
+  it('orgDoc: non-member sees 0 docs', async () => {
+    const filter = getShapeFilter('OrgDoc', { id: 'stranger' })
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('OrgDoc', filter)
+    expect(rows).toHaveLength(0)
+  })
+
+  it('orgDocItem: membership check reaches through two to-one hops', async () => {
+    const filter = getShapeFilter('OrgDocItem', { id: 'member-1' })
+    expect(filter).not.toBeNull()
+
+    const rows = await queryElectricShape('OrgDocItem', filter)
+    expect(rows).toHaveLength(2)
+    expect(rows.every(r => r.label!.startsWith('Acme'))).toBe(true)
+  })
+
+  it('orgDocItem: other org\'s member sees only their items', async () => {
+    const filter = getShapeFilter('OrgDocItem', { id: 'member-2' })
+    const rows = await queryElectricShape('OrgDocItem', filter)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.label).toBe('Other Item')
   })
 
   // -------------------------------------------------------------------------
